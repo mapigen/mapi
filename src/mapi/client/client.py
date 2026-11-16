@@ -121,13 +121,10 @@ class Mapi:
 
     def __getattr__(self, name: str) -> ProviderProxy:
         """Dynamically resolve provider names without intercepting real attributes."""
+        if name.startswith("_"):
+            raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
         try:
-            discovery = self._discovery
-        except AttributeError:
-            raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'") from None
-
-        try:
-            if discovery.provider_exists(name):
+            if hasattr(self, "_discovery") and self._discovery.provider_exists(name):
                 return ProviderProxy(self, name)
         except Exception:
             pass
