@@ -251,8 +251,10 @@ class Mapi:
             _handle_transport_error(exc, service_name, operation)
 
     def clear_cache(self) -> None:
-        """Flush the in-memory service definitions cache."""
+        """Flush the in-memory service definitions cache and validator structs."""
         self._cache.clear()
+        if self._builder._validator is not None:
+            self._builder._validator.clear_cache()
 
     # --- Context Managers ---
 

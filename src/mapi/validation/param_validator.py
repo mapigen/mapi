@@ -43,6 +43,10 @@ class ParameterValidator:
         self._cache = cache
         self._struct_cache: dict[tuple[str, str, str, str], type[msgspec.Struct] | None] = {}
 
+    def clear_cache(self) -> None:
+        """Clear cached compiled parameter structs."""
+        self._struct_cache.clear()
+
     def validate(
         self,
         provider: str,
