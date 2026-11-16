@@ -1,7 +1,7 @@
 # src/mapi/models/registry.py
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import msgspec
 from msgspec import Meta
@@ -16,6 +16,15 @@ class MetadataFile(msgspec.Struct, frozen=True, gc=False):
     auth_types: list[str]
     primary_auth: str
     popularity_rank: int
+    spec_url: str | None = None
+    download_url: str | None = None
+    title: str = ""
+    description: str = ""
+    categories: list[str] = msgspec.field(default_factory=list)
+    auth_overrides: dict[str, Any] = msgspec.field(default_factory=dict)
+    dynamic_parameters: dict[str, Any] = msgspec.field(default_factory=dict)
+    updated_at: str = ""
+    etag: str | None = None
 
 
 class ApiInfo(msgspec.Struct, frozen=True, gc=False):
@@ -26,6 +35,15 @@ class ApiInfo(msgspec.Struct, frozen=True, gc=False):
     popularity_rank: int
     auth_types: list[str]
     primary_auth: str
+    spec_url: str | None = None
+    download_url: str | None = None
+    title: str = ""
+    description: str = ""
+    categories: list[str] = msgspec.field(default_factory=list)
+    auth_overrides: dict[str, Any] = msgspec.field(default_factory=dict)
+    dynamic_parameters: dict[str, Any] = msgspec.field(default_factory=dict)
+    updated_at: str = ""
+    etag: str | None = None
 
 
 class ServiceRegistry(msgspec.Struct, frozen=True, gc=False):

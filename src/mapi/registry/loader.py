@@ -22,6 +22,7 @@ from ..exceptions import ConfigurationError, ServiceNotFoundError
 from ..models.domain import Operation, ServiceData
 from ..models.registry import ServiceRegistry
 from .packfile import PackfileLoader
+from .spec_compiler import compile_spec
 
 log = logging.getLogger(__name__)
 
@@ -116,10 +117,64 @@ class DiskLoader:
                     return self._service_msgpack_decoder.decode(content)
                 return self._service_decoder.decode(content)
 
+        # Pull-through online spec fetching if declared in registry
+        online_data = self._fetch_and_compile_service(provider, api, source)
+        if online_data is not None:
+            return online_data
+
         raise ServiceNotFoundError(
             f"Service data for '{provider}/{api}/{source}' not found. Expected at {service_dir}",
             service=f"{provider}/{api}/{source}",
         )
+
+    def _fetch_and_compile_service(
+        self, provider: str, api: str, source: str
+    ) -> ServiceData | None:
+        if os.environ.get("MAPI_OFFLINE") == "1":
+            return None
+
+        try:
+            reg = self.load_registry()
+            api_info = reg.providers.get(provider, {}).get(api)
+            if not api_info or not getattr(api_info, "spec_url", None):
+                return None
+
+            spec_url = api_info.spec_url
+            if not spec_url:
+                return None
+
+            import niquests
+
+            resp = niquests.get(spec_url, timeout=15.0)
+            if resp.status_code != 200:
+                return None
+
+            raw_bytes = resp.content or b""
+            import json
+
+            import yaml
+
+            try:
+                spec_dict = json.loads(raw_bytes)
+            except Exception:
+                spec_dict = yaml.safe_load(raw_bytes)
+
+            service_data = compile_spec(spec_dict, service_name=api)
+
+            # Atomically save to disk cache
+            service_dir = self.service_dir(provider, api, source)
+            service_dir.mkdir(parents=True, exist_ok=True)
+            target_path = service_dir / f"{api}{MAPI_EXT_ZST}"
+            tmp_path = service_dir / f".{api}.tmp"
+            compressed = zstd.ZstdCompressor(level=3).compress(msgspec.json.encode(service_data))
+            tmp_path.write_bytes(compressed)
+            tmp_path.replace(target_path)
+
+            self._path_cache[(provider, api, source)] = (target_path, True, False)
+            return service_data
+        except Exception as e:
+            log.warning("Pull-through online spec fetch failed for %s/%s: %s", provider, api, e)
+            return None
 
     def load_operation(
         self, provider: str, api: str, source: str, operation_id: str

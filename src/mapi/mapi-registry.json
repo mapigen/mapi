@@ -1,16 +1,103 @@
 {
   "version": "2.0",
-  "generated_at": "2026-11-16T22:44:33.180633+00:00",
+  "generated_at": "2026-11-16T23:15:00+00:00",
   "providers": {
     "pokeapi": {
       "REST": {
-        "sources": [
-          "github"
-        ],
+        "sources": ["github"],
         "operation_count": 102,
-        "popularity_rank": 999,
+        "popularity_rank": 3,
         "auth_types": [],
-        "primary_auth": "none"
+        "primary_auth": "none",
+        "spec_url": "https://raw.githubusercontent.com/PokeAPI/pokeapi/refs/heads/master/openapi.yml",
+        "title": "PokeAPI",
+        "description": "The RESTful Pokémon API",
+        "categories": ["games", "entertainment"]
+      }
+    },
+    "stripe": {
+      "stripe": {
+        "sources": ["github"],
+        "operation_count": 1200,
+        "popularity_rank": 1,
+        "auth_types": ["bearer_token"],
+        "primary_auth": "bearer_token",
+        "spec_url": "https://raw.githubusercontent.com/stripe/openapi/refs/heads/master/openapi/spec3.json",
+        "title": "Stripe API",
+        "description": "Online payment processing for internet businesses",
+        "categories": ["payments", "finance"]
+      }
+    },
+    "github": {
+      "REST": {
+        "sources": ["github"],
+        "operation_count": 1100,
+        "popularity_rank": 1,
+        "auth_types": ["bearer_token", "basic_auth"],
+        "primary_auth": "bearer_token",
+        "auth_overrides": {
+          "auth_types": ["bearer_token", "basic_auth"],
+          "primary_auth": "bearer_token"
+        },
+        "spec_url": "https://raw.githubusercontent.com/github/rest-api-description/refs/heads/main/descriptions/api.github.com/api.github.com.json",
+        "title": "GitHub REST API",
+        "description": "GitHub API specifications for platform integration",
+        "categories": ["developer-tools", "vcs"]
+      }
+    },
+    "discord": {
+      "REST": {
+        "sources": ["github"],
+        "operation_count": 350,
+        "popularity_rank": 2,
+        "auth_types": ["bearer_token"],
+        "primary_auth": "bearer_token",
+        "auth_overrides": {
+          "scheme": "Bot"
+        },
+        "spec_url": "https://raw.githubusercontent.com/discord/discord-api-spec/refs/heads/main/specs/openapi.json",
+        "title": "Discord REST API",
+        "description": "Discord API for bots, guilds, and messaging",
+        "categories": ["social", "chat"]
+      }
+    },
+    "spotify": {
+      "REST": {
+        "sources": ["custom"],
+        "operation_count": 120,
+        "popularity_rank": 999,
+        "auth_types": ["oauth2"],
+        "primary_auth": "oauth2",
+        "spec_url": "https://developer.spotify.com/reference/web-api/open-api-schema.yaml",
+        "title": "Spotify Web API",
+        "description": "Metadata and audio playback control for music",
+        "categories": ["media", "music"]
+      }
+    },
+    "aws": {
+      "aws-sellers": {
+        "sources": ["github"],
+        "operation_count": 85,
+        "popularity_rank": 999,
+        "auth_types": ["iam_v4"],
+        "primary_auth": "iam_v4",
+        "spec_url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/refs/heads/main/models/sellers-api-model/sellers.json",
+        "title": "Amazon Selling Partner API - Sellers",
+        "description": "Amazon SP-API for seller account information",
+        "categories": ["e-commerce", "cloud"]
+      }
+    },
+    "asana": {
+      "asana-sdk": {
+        "sources": ["github"],
+        "operation_count": 160,
+        "popularity_rank": 999,
+        "auth_types": ["bearer_token"],
+        "primary_auth": "bearer_token",
+        "spec_url": "https://raw.githubusercontent.com/Asana/openapi/refs/heads/master/defs/asana_sdk_oas.yaml",
+        "title": "Asana API",
+        "description": "Project and work management platform API",
+        "categories": ["productivity", "project-management"]
       }
     }
   }
