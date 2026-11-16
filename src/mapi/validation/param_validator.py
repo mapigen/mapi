@@ -1,12 +1,13 @@
 from __future__ import annotations
+
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 import msgspec
 
-from ..models.domain import Parameter, ParameterRef
 from ..cache.service_cache import ServiceCache
 from ..exceptions import ServiceNotFoundError, ValidationError
+from ..models.domain import Parameter, ParameterRef
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def _openapi_to_python(schema: dict[str, Any]) -> Any:
         return Any
     if openapi_type == "array":
         item_type = _openapi_to_python(schema.get("items", {}))
-        return List[item_type]
+        return list[item_type]
     return _TYPE_MAP.get(openapi_type, Any)
 
 
@@ -40,7 +41,7 @@ class ParameterValidator:
 
     def __init__(self, cache: ServiceCache) -> None:
         self._cache = cache
-        self._struct_cache: dict[tuple[str, str, str, str], Optional[type[msgspec.Struct]]] = {}
+        self._struct_cache: dict[tuple[str, str, str, str], type[msgspec.Struct] | None] = {}
 
     def validate(
         self,
@@ -49,8 +50,8 @@ class ParameterValidator:
         source: str,
         operation: str,
         kwargs: dict[str, Any],
-        service_data: Optional[Any] = None,
-        op_details: Optional[Any] = None,
+        service_data: Any | None = None,
+        op_details: Any | None = None,
     ) -> None:
         """Raise ValidationError if kwargs fail parameter schema validation."""
         service_name = f"{provider}/{api}/{source}"
@@ -97,7 +98,7 @@ class ParameterValidator:
             if param.required:
                 struct_fields.append((param.name, py_type))
             else:
-                struct_fields.append((param.name, Optional[py_type], None))
+                struct_fields.append((param.name, py_type | None, None))
 
         if not struct_fields:
             self._struct_cache[cache_key] = None

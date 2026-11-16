@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -7,14 +8,18 @@ import pytest
 import zstandard as zstd
 
 from mapi.exceptions import ConfigurationError, ServiceNotFoundError
-from mapi.models.registry import ServiceRegistry, ApiInfo
 from mapi.models.domain import ServiceData
+from mapi.registry.discovery import DiscoveryService, RegistryManager
 from mapi.registry.loader import DiskLoader
-from mapi.registry.discovery import RegistryManager, DiscoveryService
 
 
 def _write_service_data(
-    base_dir: Path, provider: str, api: str, source: str, service_data: ServiceData, compressed: bool = False
+    base_dir: Path,
+    provider: str,
+    api: str,
+    source: str,
+    service_data: ServiceData,
+    compressed: bool = False,
 ) -> Path:
     service_dir = base_dir / provider / source / api
     service_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +48,9 @@ class TestDiskLoader:
         assert reg.version == "1.0"
 
     def test_load_uncompressed_service(self, tmp_path, sample_service_data):
-        _write_service_data(tmp_path, "pokemon", "REST", "v2", sample_service_data, compressed=False)
+        _write_service_data(
+            tmp_path, "pokemon", "REST", "v2", sample_service_data, compressed=False
+        )
         loader = DiskLoader(data_dir=tmp_path, registry_path=tmp_path / "s.json")
         data = loader.load_service("pokemon", "REST", "v2")
         assert data.service_name == sample_service_data.service_name

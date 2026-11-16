@@ -1,19 +1,23 @@
 # tests/unit/test_models.py
 from __future__ import annotations
-import os
-import pytest
-import msgspec
 
-from mapi.models import (
-    Parameter, ParameterRef, ParameterUnion,
-    Server, Operation, Components, ServiceData,
-    ClientConfig, RequestConfig,
-    ResponseMetadata, MapiResult,
-    ApiInfo, ServiceRegistry,
-)
+import msgspec
+import pytest
+
 from mapi.exceptions import (
-    MapiError, ConfigurationError, ServiceNotFoundError,
-    ValidationError, TransportError, RateLimitError,
+    MapiError,
+    RateLimitError,
+    TransportError,
+)
+from mapi.models import (
+    ClientConfig,
+    MapiResult,
+    Parameter,
+    ParameterRef,
+    ParameterUnion,
+    RequestConfig,
+    ResponseMetadata,
+    ServiceData,
 )
 
 
@@ -32,7 +36,7 @@ class TestParameter:
 
     def test_frozen(self):
         p = Parameter(name="x", in_="query", schema_={})
-        with pytest.raises(Exception):
+        with pytest.raises((AttributeError, TypeError)):
             p.name = "y"  # type: ignore
 
 
@@ -98,7 +102,7 @@ class TestClientConfig:
 
     def test_frozen(self):
         cfg = ClientConfig()
-        with pytest.raises(Exception):
+        with pytest.raises((AttributeError, TypeError)):
             cfg.cache_maxsize = 999  # type: ignore
 
 
@@ -118,17 +122,24 @@ class TestResponseMetadata:
         assert m.network_duration_ms is None
 
     def test_network_duration_field(self):
-        m = ResponseMetadata(service="svc", operation="op", duration_ms=50,
-                             network_duration_ms=42, status="success")
+        m = ResponseMetadata(
+            service="svc", operation="op", duration_ms=50, network_duration_ms=42, status="success"
+        )
         assert m.duration_ms == 50
         assert m.network_duration_ms == 42
         decoded = msgspec.json.decode(msgspec.json.encode(m), type=ResponseMetadata)
         assert decoded.network_duration_ms == 42
 
     def test_encode_decode(self):
-        m = ResponseMetadata(service="svc", operation="op", duration_ms=42,
-                             network_duration_ms=30, status="error",
-                             http_status=500, error_type="server_error")
+        m = ResponseMetadata(
+            service="svc",
+            operation="op",
+            duration_ms=42,
+            network_duration_ms=30,
+            status="error",
+            http_status=500,
+            error_type="server_error",
+        )
         decoded = msgspec.json.decode(msgspec.json.encode(m), type=ResponseMetadata)
         assert decoded == m
 
@@ -137,7 +148,7 @@ class TestMapiResult:
     def test_frozen(self):
         meta = ResponseMetadata(service="s", operation="o", duration_ms=1, status="success")
         result = MapiResult(data={"id": 1}, metadata=meta)
-        with pytest.raises(Exception):
+        with pytest.raises((AttributeError, TypeError)):
             result.data = {}  # type: ignore
 
     def test_none_data_allowed(self):

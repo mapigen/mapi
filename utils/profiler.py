@@ -1,10 +1,10 @@
 import argparse
+import os
 import pstats
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-import os
 
 
 def main():
@@ -85,7 +85,7 @@ def main():
     print("-" * len(header))
 
     count = 0
-    for func, (cc, nc, tt, ct, callers) in stats.stats.items():  # type: ignore
+    for func, (_cc, nc, tt, ct, _callers) in stats.stats.items():  # type: ignore
         if count >= args.limit:
             break
 
@@ -96,20 +96,11 @@ def main():
         if filter_str and not (filter_str in file.lower() or filter_str in name.lower()):
             continue
 
-        if file == '~':
-            func_display = name  # For built-in functions
-        else:
-            func_display = f"{Path(file).name}:{line} ({name})"
+        func_display = name if file == "~" else f"{Path(file).name}:{line} ({name})"
 
-        row = (
-            f"{func_display:<80} "
-            f"{nc:>10} "
-            f"{tt * 1000:>18.3f} "
-            f"{ct * 1000:>24.3f}"
-        )
+        row = f"{func_display:<80} {nc:>10} {tt * 1000:>18.3f} {ct * 1000:>24.3f}"
         print(row)
         count += 1
-
 
 
 if __name__ == "__main__":

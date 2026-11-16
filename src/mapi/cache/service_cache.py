@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import threading
 from functools import lru_cache
 
@@ -9,7 +10,7 @@ from ..registry.loader import DiskLoader
 class ServiceCache:
     """
     Thread-safe pinned-LRU cache for ServiceData objects.
-    
+
     Pinned keys are held in memory permanently.
     Evictable keys are governed by functools.lru_cache.
     """

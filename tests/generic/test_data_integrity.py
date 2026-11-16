@@ -1,15 +1,15 @@
 """Generic, dynamic tests that verify the integrity of all populated service data."""
-from typing import List, Tuple
 
 import pytest
+
 from mapi import Mapi
 from mapi.exceptions import ServiceNotFoundError
 from mapi.models import ParameterRef
 
 
-def get_all_service_identifiers() -> List[Tuple[str, str, str]]:
+def get_all_service_identifiers() -> list[tuple[str, str, str]]:
     """Discovers and returns a list of all available (provider, api, source) tuples."""
-    identifiers: List[Tuple[str, str, str]] = []
+    identifiers: list[tuple[str, str, str]] = []
     try:
         client = Mapi()
         providers = client.discovery.list_providers()
@@ -46,6 +46,6 @@ def test_service_data_integrity(provider: str, api: str, source: str):
 
         for param in operation.parameters:
             if isinstance(param, ParameterRef):
-                assert (
-                    param.component_name in service_data.components.parameters
-                ), f"Broken parameter reference '{param.ref}' in {api}/{operation_name}"
+                assert param.component_name in service_data.components.parameters, (
+                    f"Broken parameter reference '{param.ref}' in {api}/{operation_name}"
+                )

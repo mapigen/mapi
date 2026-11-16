@@ -1,9 +1,12 @@
 # tests/unit/test_tools.py
 from __future__ import annotations
+
 from pathlib import Path
+
 import pytest
 
-from tools import utils, pipeline
+from tools import pipeline, utils
+
 from .. import helpers
 
 
@@ -51,7 +54,9 @@ def test_process_single_service_failure(tmp_path: Path):
         "provider": "corrupted_service",
         "api": "corrupted_service",
         "source": "custom",
-        "url": "http://localhost/corrupted.json"
+        "url": "http://localhost/corrupted.json",
     }
-    result = pipeline.process_single_service(service_info, tmp_path / "data", no_compress_utilize=True)
+    result = pipeline.process_single_service(
+        service_info, tmp_path / "data", no_compress_utilize=True
+    )
     assert result["status"] == "failure"

@@ -1,13 +1,23 @@
 # tests/benchmark_profile.py
 """Benchmark and profiling script for mapi SDK core execution."""
+
 from __future__ import annotations
+
 import cProfile
 import pstats
 import time
 from unittest.mock import MagicMock
 
 from mapi import Mapi
-from mapi.models import ServiceData, Server, Operation, Parameter, ServiceRegistry, ApiInfo
+from mapi.models import (
+    ApiInfo,
+    Components,
+    Operation,
+    Parameter,
+    Server,
+    ServiceData,
+    ServiceRegistry,
+)
 
 
 def create_mock_client() -> Mapi:
@@ -16,13 +26,15 @@ def create_mock_client() -> Mapi:
         format_version=3,
         service_name="REST",
         servers=[Server(url="https://api.example.com", description="")],
-        components={"parameters": {}, "schemas": {}},
+        components=Components(),
         operations={
             "get_pokemon": Operation(
                 service="REST",
                 path="/pokemon/{id}",
                 method="GET",
-                parameters=[Parameter(name="id", in_="path", schema_={"type": "string"}, required=True)],
+                parameters=[
+                    Parameter(name="id", in_="path", schema_={"type": "string"}, required=True)
+                ],
             )
         },
     )
@@ -70,17 +82,19 @@ def run_benchmark(iterations: int = 1000):
 
     t0 = time.perf_counter()
     for _ in range(iterations):
-        res = client.pokeapi.REST("get_pokemon", id="pikachu")
+        client.pokeapi.REST("get_pokemon", id="pikachu")
     total_time = time.perf_counter() - t0
 
     pr.disable()
 
-    print(f"\n================ BENCHMARK RESULTS ================")
+    print("\n================ BENCHMARK RESULTS ================")
     print(f"Iterations: {iterations}")
     print(f"Total time: {total_time:.4f}s")
-    print(f"Per call:   {(total_time / iterations) * 1000:.3f}ms ({(total_time / iterations) * 1_000_000:.1f}µs)")
+    print(
+        f"Per call:   {(total_time / iterations) * 1000:.3f}ms ({(total_time / iterations) * 1_000_000:.1f}µs)"
+    )
     print(f"Throughput: {iterations / total_time:.1f} ops/sec")
-    print(f"===================================================\n")
+    print("===================================================\n")
 
     stats = pstats.Stats(pr)
     stats.strip_dirs().sort_stats("cumtime").print_stats(25)

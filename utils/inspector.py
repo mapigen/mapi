@@ -30,22 +30,30 @@ def main():
     subparsers.add_parser("list-providers", help="List all available provider names.")
 
     # --- list-apis command ---
-    list_apis_parser = subparsers.add_parser("list-apis", help="List all APIs for a specific provider.")
+    list_apis_parser = subparsers.add_parser(
+        "list-apis", help="List all APIs for a specific provider."
+    )
     list_apis_parser.add_argument("provider", help="The name of the provider.")
 
     # --- list-ops command ---
-    list_ops_parser = subparsers.add_parser("list-ops", help="List all operations for a specific API.")
+    list_ops_parser = subparsers.add_parser(
+        "list-ops", help="List all operations for a specific API."
+    )
     list_ops_parser.add_argument("provider", help="The name of the provider.")
     list_ops_parser.add_argument("api", help="The name of the API.")
 
     # --- get-op command ---
-    get_op_parser = subparsers.add_parser("get-op", help="Get the detailed schema for a specific operation.")
+    get_op_parser = subparsers.add_parser(
+        "get-op", help="Get the detailed schema for a specific operation."
+    )
     get_op_parser.add_argument("provider", help="The name of the provider.")
     get_op_parser.add_argument("api", help="The name of the API.")
     get_op_parser.add_argument("operation", help="The name of the operation.")
 
     # --- get-auth command ---
-    get_auth_parser = subparsers.add_parser("get-auth", help="Get the authentication details for a specific API.")
+    get_auth_parser = subparsers.add_parser(
+        "get-auth", help="Get the authentication details for a specific API."
+    )
     get_auth_parser.add_argument("provider", help="The name of the provider.")
     get_auth_parser.add_argument("api", help="The name of the API.")
 
@@ -76,7 +84,9 @@ def main():
             return
         source = api_info.sources[0]
 
-        operation_data = client.discovery.get_operation(args.provider, args.api, args.operation, source)
+        operation_data = client.discovery.get_operation(
+            args.provider, args.api, args.operation, source
+        )
         if operation_data:
             full_service_data = client._loader.load_service(args.provider, args.api, source)
             resolved_params = []

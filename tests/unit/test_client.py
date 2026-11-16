@@ -1,20 +1,21 @@
 from __future__ import annotations
+
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from niquests.exceptions import HTTPError
 
-from mapi import Mapi, MapiResult, BearerAuth, ApiKeyAuth
+from mapi import ApiKeyAuth, BearerAuth, Mapi, MapiResult
 from mapi.exceptions import (
     ClientError,
     RateLimitError,
     ServerError,
-    ServiceNotFoundError,
 )
 from mapi.models.config import ClientConfig
 from mapi.models.request import RequestConfig
-from mapi.proxy.provider import ProviderProxy
 from mapi.proxy.api import ApiProxy
+from mapi.proxy.provider import ProviderProxy
 
 
 def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
@@ -23,9 +24,12 @@ def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
 
     discovery = MagicMock()
     discovery.provider_exists.side_effect = lambda p: p in ("pokeapi", "github")
-    discovery.api_exists.side_effect = lambda p, a: (p, a) in (
-        ("pokeapi", "REST"),
-        ("github", "rest"),
+    discovery.api_exists.side_effect = lambda p, a: (
+        (p, a)
+        in (
+            ("pokeapi", "REST"),
+            ("github", "rest"),
+        )
     )
     discovery.get_api_info.return_value = MagicMock(sources=["openapi"])
     client._discovery = discovery
@@ -35,9 +39,7 @@ def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
     client._cache = cache
 
     builder = MagicMock()
-    builder.build.return_value = RequestConfig(
-        method="GET", url="https://api.example.com/users/1"
-    )
+    builder.build.return_value = RequestConfig(method="GET", url="https://api.example.com/users/1")
     client._builder = builder
 
     transport = MagicMock()
@@ -56,13 +58,15 @@ def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
 
 class TestMapiInit:
     def test_string_token_auto_converts_to_bearer(self):
-        with patch("mapi.client.client.DiskLoader"), \
-             patch("mapi.client.client.RegistryManager"), \
-             patch("mapi.client.client.DiscoveryService"), \
-             patch("mapi.client.client.ServiceCache"), \
-             patch("mapi.client.client.ParameterValidator"), \
-             patch("mapi.client.client.RequestBuilder"), \
-             patch("mapi.client.client.NiquestsTransport"):
+        with (
+            patch("mapi.client.client.DiskLoader"),
+            patch("mapi.client.client.RegistryManager"),
+            patch("mapi.client.client.DiscoveryService"),
+            patch("mapi.client.client.ServiceCache"),
+            patch("mapi.client.client.ParameterValidator"),
+            patch("mapi.client.client.RequestBuilder"),
+            patch("mapi.client.client.NiquestsTransport"),
+        ):
             client = Mapi(auth="test_token_xyz")
         assert isinstance(client._auth, BearerAuth)
         assert client._auth.token == "test_token_xyz"
@@ -136,7 +140,9 @@ class TestMapiExecution:
         client = _build_test_mapi(sample_service_data, sample_registry)
         resp = MagicMock()
         resp.status_code = 429
-        client._transport.request.side_effect = HTTPError("Too Many Requests", response=resp)
+        cast(MagicMock, client._transport.request).side_effect = HTTPError(
+            "Too Many Requests", response=resp
+        )
         with pytest.raises(RateLimitError) as exc_info:
             client.pokeapi.REST("get_pokemon")
         assert exc_info.value.http_status == 429
@@ -145,7 +151,9 @@ class TestMapiExecution:
         client = _build_test_mapi(sample_service_data, sample_registry)
         resp = MagicMock()
         resp.status_code = 503
-        client._transport.request.side_effect = HTTPError("Service Unavailable", response=resp)
+        cast(MagicMock, client._transport.request).side_effect = HTTPError(
+            "Service Unavailable", response=resp
+        )
         with pytest.raises(ServerError) as exc_info:
             client.pokeapi.REST("get_pokemon")
         assert exc_info.value.http_status == 503
@@ -154,7 +162,9 @@ class TestMapiExecution:
         client = _build_test_mapi(sample_service_data, sample_registry)
         resp = MagicMock()
         resp.status_code = 404
-        client._transport.request.side_effect = HTTPError("Not Found", response=resp)
+        cast(MagicMock, client._transport.request).side_effect = HTTPError(
+            "Not Found", response=resp
+        )
         with pytest.raises(ClientError) as exc_info:
             client.pokeapi.REST("get_pokemon")
         assert exc_info.value.http_status == 404
@@ -165,16 +175,18 @@ class TestMapiContextManager:
         client = _build_test_mapi(sample_service_data, sample_registry)
         with client:
             pass
-        client._transport.close.assert_called_once()
+        cast(MagicMock, client._transport.close).assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_async_context_manager_closes_transport(self, sample_service_data, sample_registry):
+    async def test_async_context_manager_closes_transport(
+        self, sample_service_data, sample_registry
+    ):
         client = _build_test_mapi(sample_service_data, sample_registry)
         async with client:
             pass
-        client._transport.aclose.assert_called_once()
+        cast(MagicMock, client._transport.aclose).assert_called_once()
 
     def test_clear_cache_delegates(self, sample_service_data, sample_registry):
         client = _build_test_mapi(sample_service_data, sample_registry)
         client.clear_cache()
-        client._cache.clear.assert_called_once()
+        cast(MagicMock, client._cache.clear).assert_called_once()

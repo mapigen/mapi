@@ -80,7 +80,9 @@ ditto_data = response.data
 call_metadata = response.metadata
 
 print(f"Fetched data for: {ditto_data['name']}")
-print(f"Call took {call_metadata.duration_ms}ms with status: {call_metadata.status} (HTTP {call_metadata.http_status})")
+print(
+    f"Call took {call_metadata.duration_ms}ms with status: {call_metadata.status} (HTTP {call_metadata.http_status})"
+)
 ```
 
 #### 2. Direct `execute()` Calls
@@ -109,6 +111,7 @@ For high-performance applications, `mapi` provides native asynchronous methods p
 import asyncio
 from mapi import Mapi
 
+
 async def fetch_all_pokemon():
     async with Mapi() as client:
         # 1. Async Proxy-Based Calls
@@ -118,9 +121,12 @@ async def fetch_all_pokemon():
             print(f"Async fetch successful for: {response.data['name']}")
 
         # 2. Async Direct `aexecute()` Calls
-        response = await client.aexecute("pokeapi", "REST", "openapi", "api_v2_pokemon_retrieve", id="charmander")
+        response = await client.aexecute(
+            "pokeapi", "REST", "openapi", "api_v2_pokemon_retrieve", id="charmander"
+        )
         if response.data:
             print(f"Async fetch successful for: {response.data['name']}")
+
 
 asyncio.run(fetch_all_pokemon())
 ```

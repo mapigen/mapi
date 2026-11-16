@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 from typing import Literal
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from niquests.auth import AuthBase
 from niquests.models import PreparedRequest
+from niquests.structures import CaseInsensitiveDict
 
 
 class ApiKeyAuth(AuthBase):
@@ -26,7 +28,7 @@ class ApiKeyAuth(AuthBase):
     def __call__(self, r: PreparedRequest) -> PreparedRequest:
         if self.placement == "header":
             if r.headers is None:
-                r.headers = {}
+                r.headers = CaseInsensitiveDict()
             r.headers[self.name] = self.key
         elif self.placement == "query" and r.url is not None:
             parsed = urlparse(r.url)

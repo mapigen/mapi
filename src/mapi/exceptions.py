@@ -1,16 +1,16 @@
 # src/mapi/exceptions.py
 from __future__ import annotations
-from typing import Optional
 
 
 class MapiError(Exception):
     """Base exception for all mapi errors."""
+
     def __init__(
         self,
         message: str,
         *,
-        service: Optional[str] = None,
-        operation: Optional[str] = None,
+        service: str | None = None,
+        operation: str | None = None,
     ) -> None:
         super().__init__(message)
         self.service = service
@@ -31,14 +31,15 @@ class ValidationError(MapiError):
 
 class TransportError(MapiError):
     """Raised for network or HTTP-level errors."""
+
     def __init__(
         self,
         message: str,
         *,
-        service: Optional[str] = None,
-        operation: Optional[str] = None,
-        http_status: Optional[int] = None,
-        cause: Optional[BaseException] = None,
+        service: str | None = None,
+        operation: str | None = None,
+        http_status: int | None = None,
+        cause: BaseException | None = None,
     ) -> None:
         super().__init__(message, service=service, operation=operation)
         self.http_status = http_status

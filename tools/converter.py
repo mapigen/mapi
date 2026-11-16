@@ -1,6 +1,8 @@
 from __future__ import annotations
+
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import msgspec
 
@@ -8,8 +10,8 @@ from .utils import decompress_zstd
 
 
 def normalize_spec(
-    path: Optional[Path] = None,
-    compressed_content: Optional[bytes] = None,
+    path: Path | None = None,
+    compressed_content: bytes | None = None,
 ) -> Mapping[str, Any]:
     """Loads and parses an OpenAPI spec from a file path or compressed content."""
     if not path and not compressed_content:

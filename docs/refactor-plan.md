@@ -132,14 +132,14 @@ Migrate from `mapigen/models.py`. Keep `msgspec.Struct` (frozen) as the only mod
 
 ```python
 # Exact types to define (all frozen Structs):
-BaseStruct          # base class, frozen=True
-Parameter           # name, in_, schema_, description, required — tagged 'inline'
-ParameterRef        # ref ($ref) — tagged 'ref'
-ParameterUnion      # Union[Parameter, ParameterRef]
-Server              # url, description, variables
-Operation           # service, path, method, operation_id, summary, description, parameters, deprecated
-Components          # parameters: Dict[str, Parameter], schemas: Dict[str, Dict]
-ServiceData         # format_version, service_name, servers, components, operations
+BaseStruct  # base class, frozen=True
+Parameter  # name, in_, schema_, description, required — tagged 'inline'
+ParameterRef  # ref ($ref) — tagged 'ref'
+ParameterUnion  # Union[Parameter, ParameterRef]
+Server  # url, description, variables
+Operation  # service, path, method, operation_id, summary, description, parameters, deprecated
+Components  # parameters: Dict[str, Parameter], schemas: Dict[str, Dict]
+ServiceData  # format_version, service_name, servers, components, operations
 ```
 
 No changes to field semantics. Drop the exception classes currently in `models.py` — they move to `exceptions.py`.
@@ -147,9 +147,9 @@ No changes to field semantics. Drop the exception classes currently in `models.p
 #### 1.2 — `mapi/models/registry.py`
 
 ```python
-MetadataFile        # operation_count, auth_types, primary_auth, popularity_rank
-ApiInfo             # sources, operation_count, popularity_rank, auth_types, primary_auth
-ServiceRegistry     # version, generated_at, providers: Dict[str, Dict[str, ApiInfo]]
+MetadataFile  # operation_count, auth_types, primary_auth, popularity_rank
+ApiInfo  # sources, operation_count, popularity_rank, auth_types, primary_auth
+ServiceRegistry  # version, generated_at, providers: Dict[str, Dict[str, ApiInfo]]
 ```
 
 #### 1.3 — `mapi/models/config.py`
@@ -193,8 +193,9 @@ class ResponseMetadata(BaseStruct, frozen=True):
     error_type: Optional[str] = None
     error_category: Optional[str] = None
 
+
 class MapiResult(BaseStruct, frozen=True):
-    data: Optional[Any]                 # JSON response body
+    data: Optional[Any]  # JSON response body
     metadata: ResponseMetadata
 ```
 
@@ -207,15 +208,25 @@ Clean hierarchy:
 ```python
 class MapiError(Exception):
     """Base exception for all Mapi errors."""
+
     service: Optional[str]
     operation: Optional[str]
-    
-class ConfigurationError(MapiError): ...     # bad config, missing data
-class ValidationError(MapiError): ...        # parameter validation failed
-class TransportError(MapiError):              # network/HTTP errors
+
+
+class ConfigurationError(MapiError): ...  # bad config, missing data
+
+
+class ValidationError(MapiError): ...  # parameter validation failed
+
+
+class TransportError(MapiError):  # network/HTTP errors
     http_status: Optional[int]
-class ServiceNotFoundError(MapiError): ...   # unknown provider/api/operation
-class RateLimitError(TransportError): ...    # 429
+
+
+class ServiceNotFoundError(MapiError): ...  # unknown provider/api/operation
+
+
+class RateLimitError(TransportError): ...  # 429
 ```
 
 > [!IMPORTANT]
@@ -234,10 +245,12 @@ class RateLimitError(TransportError): ...    # 429
 class AuthStrategy(Protocol):
     def apply(self, request: PreparedRequest) -> PreparedRequest: ...
 
+
 # auth/api_key.py
 class ApiKeyAuth(AuthStrategy):
     def __init__(self, key: str, name: str, placement: Literal["header", "query", "cookie"]): ...
     def apply(self, request: PreparedRequest) -> PreparedRequest: ...
+
 
 # auth/bearer.py
 class BearerAuth(AuthStrategy):
@@ -255,9 +268,12 @@ Keep the `niquests.auth.AuthBase` compatibility — `ApiKeyAuth` and `BearerAuth
 # transport/base.py
 class Transport(Protocol):
     def request(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response: ...
-    async def arequest(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response: ...
+    async def arequest(
+        self, config: RequestConfig, auth: Optional[AuthBase] = None
+    ) -> Response: ...
     def close(self) -> None: ...
     async def aclose(self) -> None: ...
+
 
 # transport/niquests.py
 class NiquestsTransport(Transport):
@@ -268,18 +284,26 @@ class NiquestsTransport(Transport):
 
     def request(self, config: RequestConfig, auth=None) -> Response:
         return self._sync_session.request(
-            config.method, config.url, params=config.params,
-            headers=config.headers, json=config.json_body,
-            timeout=config.timeout, auth=auth
+            config.method,
+            config.url,
+            params=config.params,
+            headers=config.headers,
+            json=config.json_body,
+            timeout=config.timeout,
+            auth=auth,
         )
 
     async def arequest(self, config: RequestConfig, auth=None) -> Response:
         if self._async_session is None:
             self._async_session = niquests.AsyncSession(**self._kwargs)
         return await self._async_session.request(
-            config.method, config.url, params=config.params,
-            headers=config.headers, json=config.json_body,
-            timeout=config.timeout, auth=auth
+            config.method,
+            config.url,
+            params=config.params,
+            headers=config.headers,
+            json=config.json_body,
+            timeout=config.timeout,
+            auth=auth,
         )
 
     def close(self):
@@ -331,6 +355,7 @@ This replaces: `path_utils.py`, `load_service_from_disk()`, `_load_zstd_metadata
 ```python
 class RegistryManager:
     """Thread-safe singleton that holds the loaded ServiceRegistry."""
+
     _instance: ClassVar[Optional[RegistryManager]] = None
     _lock: ClassVar[threading.Lock] = threading.Lock()
 
@@ -367,8 +392,12 @@ class DiscoveryService:
     def list_providers(self) -> list[str]: ...
     def list_apis(self, provider: str) -> list[str]: ...
     def get_api_info(self, provider: str, api: str) -> ApiInfo: ...
-    def list_operations(self, provider: str, api: str, source: Optional[str] = None) -> list[str]: ...
-    def get_operation(self, provider: str, api: str, operation: str, source: Optional[str] = None) -> Operation: ...
+    def list_operations(
+        self, provider: str, api: str, source: Optional[str] = None
+    ) -> list[str]: ...
+    def get_operation(
+        self, provider: str, api: str, operation: str, source: Optional[str] = None
+    ) -> Operation: ...
 ```
 
 No more `operations.py` calling `load_service_from_disk` directly — it goes through the cache.
@@ -379,10 +408,12 @@ Migrate `PinnedLRUCache` with one change: the loader is now the `DiskLoader` ins
 
 ```python
 class ServiceCache:
-    def __init__(self, loader: DiskLoader, pinned_keys: frozenset[str] = frozenset(), maxsize: int = 64):
+    def __init__(
+        self, loader: DiskLoader, pinned_keys: frozenset[str] = frozenset(), maxsize: int = 64
+    ):
         self._loader = loader
         ...
-    
+
     def get(self, provider: str, api: str, source: str) -> ServiceData:
         key = f"{provider}:{api}:{source}"
         ...
@@ -398,11 +429,13 @@ class ServiceCache:
 # validation/param_validator.py
 class ParameterValidator:
     """Validates kwargs against an Operation's parameter definitions."""
-    
+
     def __init__(self, cache: ServiceCache):
         self._cache = cache
 
-    def validate(self, provider: str, api: str, source: str, operation: str, kwargs: dict[str, Any]) -> None:
+    def validate(
+        self, provider: str, api: str, source: str, operation: str, kwargs: dict[str, Any]
+    ) -> None:
         """Raises ValidationError if kwargs don't match the operation's schema."""
         service_data = self._cache.get(provider, api, source)
         op = service_data.operations.get(operation)
@@ -427,26 +460,41 @@ Extract request preparation from `Mapi._prepare_request_config`:
 ```python
 class RequestBuilder:
     """Builds a RequestConfig from an operation and kwargs."""
-    
+
     def __init__(self, cache: ServiceCache, validator: Optional[ParameterValidator] = None):
         self._cache = cache
         self._validator = validator
 
-    def build(self, provider: str, api: str, source: str, operation: str,
-              base_url: Optional[str] = None, timeout: float = 30.0, **kwargs) -> RequestConfig:
+    def build(
+        self,
+        provider: str,
+        api: str,
+        source: str,
+        operation: str,
+        base_url: Optional[str] = None,
+        timeout: float = 30.0,
+        **kwargs,
+    ) -> RequestConfig:
         """Resolves operation → URL + params → RequestConfig."""
         if self._validator:
             self._validator.validate(provider, api, source, operation, kwargs)
-        
+
         service_data = self._cache.get(provider, api, source)
         op = service_data.operations.get(operation)
         if not op:
             raise ServiceNotFoundError(...)
-        
+
         url = base_url or service_data.servers[0].url
         # Parameter bucketing (path, query, body, header) — same logic
         ...
-        return RequestConfig(method=op.method, url=full_url, params=query, headers=headers, json_body=body, timeout=timeout)
+        return RequestConfig(
+            method=op.method,
+            url=full_url,
+            params=query,
+            headers=headers,
+            json_body=body,
+            timeout=timeout,
+        )
 ```
 
 #### 5.2 — `proxy/provider.py` and `proxy/api.py`
@@ -456,24 +504,27 @@ Same UX, clean internals:
 ```python
 class ProviderProxy:
     __slots__ = ("_client", "_provider")
-    
+
     def __init__(self, client: Mapi, provider: str):
         self._client = client
         self._provider = provider
-    
+
     def __getattr__(self, api: str) -> ApiProxy:
         if not self._client._discovery.api_exists(self._provider, api):
             raise AttributeError(f"API '{api}' not found for provider '{self._provider}'")
         return ApiProxy(self._client, self._provider, api)
 
+
 class ApiProxy:
     __slots__ = ("_client", "_provider", "_api", "_source")
-    
+
     def __call__(self, operation: str, **kwargs) -> MapiResult:
         return self._client.execute(self._provider, self._api, self._source, operation, **kwargs)
 
     async def aexecute(self, operation: str, **kwargs) -> MapiResult:
-        return await self._client.aexecute(self._provider, self._api, self._source, operation, **kwargs)
+        return await self._client.aexecute(
+            self._provider, self._api, self._source, operation, **kwargs
+        )
 ```
 
 **Fix:** `aexecute` is now a proper `async def`, not a generator with `__await__`.
@@ -485,7 +536,7 @@ The `Mapi` class becomes a thin composition root:
 ```python
 class Mapi:
     """Universal API client. Factory-constructs all dependencies."""
-    
+
     def __init__(
         self,
         config: Optional[ClientConfig] = None,
@@ -495,10 +546,12 @@ class Mapi:
         **transport_kwargs,
     ):
         cfg = config or ClientConfig()
-        
+
         # Wire dependencies
         _data_dir = data_dir or _default_data_dir()
-        self._loader = DiskLoader(data_dir=_data_dir, registry_path=_data_dir.parent / "services.json")
+        self._loader = DiskLoader(
+            data_dir=_data_dir, registry_path=_data_dir.parent / "services.json"
+        )
         self._registry_mgr = RegistryManager.get_instance(self._loader)
         self._discovery = DiscoveryService(self._registry_mgr, self._loader)
         self._cache = ServiceCache(self._loader, frozenset(cfg.pinned_services), cfg.cache_maxsize)
@@ -520,14 +573,17 @@ class Mapi:
 
     def execute(self, provider, api, source, operation, **kwargs) -> MapiResult:
         start = time.monotonic()
-        config = self._request_builder.build(provider, api, source, operation,
-                                              base_url=self._config.base_url,
-                                              timeout=self._config.default_timeout, **kwargs)
-        response = self._transport.request(config, auth=self._auth)
-        return MapiResult(
-            data=response.json(),
-            metadata=ResponseMetadata(...)
+        config = self._request_builder.build(
+            provider,
+            api,
+            source,
+            operation,
+            base_url=self._config.base_url,
+            timeout=self._config.default_timeout,
+            **kwargs,
         )
+        response = self._transport.request(config, auth=self._auth)
+        return MapiResult(data=response.json(), metadata=ResponseMetadata(...))
 
     async def aexecute(self, provider, api, source, operation, **kwargs) -> MapiResult:
         # Same as execute but uses self._transport.arequest
@@ -539,10 +595,17 @@ class Mapi:
     async def aclose(self):
         await self._transport.aclose()
 
-    def __enter__(self): return self
-    def __exit__(self, *args): self.close()
-    async def __aenter__(self): return self
-    async def __aexit__(self, *args): await self.aclose()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.aclose()
 ```
 
 > [!IMPORTANT]

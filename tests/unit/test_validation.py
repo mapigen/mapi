@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,6 +38,7 @@ class TestParameterValidator:
 
     def test_operation_with_no_parameters_passes(self):
         import msgspec
+
         from mapi.models.domain import ServiceData
 
         sd_dict = {

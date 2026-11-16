@@ -1,11 +1,13 @@
 import os
+from typing import Any
+
 import pytest
 from dotenv import load_dotenv
-from typing import Any, List, Dict
 
-from mapi import Mapi, MapiError
+from mapi import BearerAuth, Mapi, MapiError
+
 from ..helpers import result_reporter
-from ..reporting import run_test_operation, REQUIRED_CREDS
+from ..reporting import REQUIRED_CREDS, run_test_operation
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,7 +25,7 @@ def client() -> Mapi:
     if not TOKEN:
         pytest.skip("DISCORD_BOT_TOKEN not found, skipping client fixture.")
     # Discord requires a special "Bot" scheme for its token.
-    return Mapi(auth=Auth.BearerAuth(TOKEN, scheme="Bot"))
+    return Mapi(auth=BearerAuth(TOKEN, scheme="Bot"))
 
 
 def test_discord_integration(client: Mapi):
@@ -32,14 +34,14 @@ def test_discord_integration(client: Mapi):
         result_reporter.add_skipped(f"{SERVICE_NAME}/{SERVICE_NAME}", REQUIRED_CREDS[SERVICE_NAME])
         pytest.skip(f"Skipping {SERVICE_NAME} tests; missing required credentials.")
 
-    operations_checked: List[str] = []
+    operations_checked: list[str] = []
     op_name = ""
     try:
         # --- Test 1: Create Message ---
         op_name = "create_message"
         content = "Mapi Client test..."
 
-        def assert_create_message(data: Dict[str, Any]):
+        def assert_create_message(data: dict[str, Any]):
             assert data.get("content") == content
 
         run_test_operation(
@@ -55,7 +57,8 @@ def test_discord_integration(client: Mapi):
 
         # --- Test 2: Get Channel ---
         op_name = "get_channel"
-        def assert_get_channel(data: Dict[str, Any]):
+
+        def assert_get_channel(data: dict[str, Any]):
             assert data.get("id") == CHANNEL_ID
 
         run_test_operation(
@@ -70,7 +73,8 @@ def test_discord_integration(client: Mapi):
 
         # --- Test 3: List Messages ---
         op_name = "list_messages"
-        def assert_list_messages(data: List[Dict[str, Any]]):
+
+        def assert_list_messages(data: list[dict[str, Any]]):
             assert isinstance(data, list)
             assert len(data) <= 5
 
@@ -84,12 +88,13 @@ def test_discord_integration(client: Mapi):
             channel_id=CHANNEL_ID,
             limit=5,
         )
-        
+
         # --- Test 4: Get Message ---
         op_name = "get_message"
-        def assert_get_messages(data: Dict[str, Any]):
+
+        def assert_get_messages(data: dict[str, Any]):
             assert data.get("id") == MESSAGE_ID
-        
+
         run_test_operation(
             client=client,
             provider_name=SERVICE_NAME,

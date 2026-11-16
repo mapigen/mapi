@@ -1,9 +1,10 @@
-import json
 import argparse
-from typing import Any, Union
+import json
 from pathlib import Path
+from typing import Any, Union
 
 import msgspec
+
 from mapi.models.response import ResponseMetadata
 
 
@@ -21,7 +22,9 @@ def format_type(type_hint: Any) -> str:
 def show_schema():
     """Prints the standard response format of the mapi SDK."""
     print("#-- mapi SDK Standard Response Format --#\n")
-    metadata_fields = {f.name: format_type(f.type) for f in msgspec.structs.fields(ResponseMetadata)}
+    metadata_fields = {
+        f.name: format_type(f.type) for f in msgspec.structs.fields(ResponseMetadata)
+    }
     response_structure = {
         "data": "# The JSON payload from the API service (or null on error).",
         "metadata": metadata_fields,
@@ -36,7 +39,7 @@ def show_data(file_path: Path):
         return
 
     print(f"#-- Displaying contents of: {file_path.name} --#\n")
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         data = json.load(f)
         print(json.dumps(data, indent=2))
 

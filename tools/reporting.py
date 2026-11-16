@@ -1,7 +1,8 @@
 from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +18,9 @@ This document tracks which API specifications have had their authentication info
 """
     content += "\n## Services with Active Overrides\n\n"
     if services_with_override:
-        content += "The following services are using authentication details from `overrides.json`:\n"
+        content += (
+            "The following services are using authentication details from `overrides.json`:\n"
+        )
         for service in sorted(services_with_override):
             content += f"- `{service}`\n"
     else:
@@ -36,8 +39,8 @@ This document tracks which API specifications have had their authentication info
 
 
 def generate_performance_report(
-    download_results: List[Dict[str, Any]],
-    processing_results: List[Dict[str, Any]],
+    download_results: list[dict[str, Any]],
+    processing_results: list[dict[str, Any]],
     total_duration: float,
 ) -> None:
     successful_downloads = [r for r in download_results if r.get("status") == "success"]
@@ -48,10 +51,14 @@ def generate_performance_report(
 
     if download_results:
         print(f"\nDownload Phase: {len(download_results)} services")
-        print(f"  Success: {len(successful_downloads)}, Failures: {len(download_results) - len(successful_downloads)}")
+        print(
+            f"  Success: {len(successful_downloads)}, Failures: {len(download_results) - len(successful_downloads)}"
+        )
 
     if processing_results:
         print(f"\nProcessing Phase: {len(processing_results)} services")
-        print(f"  Success: {len(successful_processing)}, Failures: {len(processing_results) - len(successful_processing)}")
+        print(
+            f"  Success: {len(successful_processing)}, Failures: {len(processing_results) - len(successful_processing)}"
+        )
 
     print("-------------------------")

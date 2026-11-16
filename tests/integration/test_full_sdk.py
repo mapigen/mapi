@@ -1,24 +1,23 @@
 from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import msgspec
 import pytest
 
-from mapi import Mapi, MapiResult, BearerAuth
+from mapi import BearerAuth, Mapi, MapiResult
 from mapi.exceptions import (
-    ClientError,
-    RateLimitError,
-    ServerError,
     ValidationError,
 )
-from mapi.models.config import ClientConfig
 from mapi.models.domain import ServiceData
 from mapi.models.registry import ServiceRegistry
 
 
 @pytest.fixture
-def mock_sdk_environment(tmp_path: Path, sample_service_data: ServiceData, sample_registry: ServiceRegistry):
+def mock_sdk_environment(
+    tmp_path: Path, sample_service_data: ServiceData, sample_registry: ServiceRegistry
+):
     """Sets up a complete real filesystem environment for integration testing."""
     data_dir = tmp_path / "data"
     registry_path = tmp_path / "services.json"
@@ -97,7 +96,9 @@ def test_string_auth_header_propagation(mock_sdk_environment):
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"login": "octocat"}
 
-    with patch.object(client._transport._sync_session, "request", return_value=mock_resp) as mock_req:
+    with patch.object(
+        client._transport._sync_session, "request", return_value=mock_resp
+    ) as mock_req:
         client.pokeapi.REST("get_user", user_id=1)
 
     assert mock_req.call_args[1].get("auth") is client._auth

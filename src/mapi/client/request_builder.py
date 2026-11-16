@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from ..cache.service_cache import ServiceCache
 from ..exceptions import ServiceNotFoundError
@@ -19,7 +20,7 @@ class RequestBuilder:
     def __init__(
         self,
         cache: ServiceCache,
-        validator: Optional[ParameterValidator] = None,
+        validator: ParameterValidator | None = None,
     ) -> None:
         self._cache = cache
         self._validator = validator
@@ -31,7 +32,7 @@ class RequestBuilder:
         source: str,
         operation: str,
         *,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
         timeout: float = 30.0,
         **kwargs: Any,
     ) -> RequestConfig:
@@ -54,7 +55,9 @@ class RequestBuilder:
             )
 
         # 3. Resolve base URL
-        resolved_base_url = base_url or (service_data.servers[0].url if service_data.servers else None)
+        resolved_base_url = base_url or (
+            service_data.servers[0].url if service_data.servers else None
+        )
         if not resolved_base_url:
             raise ServiceNotFoundError(
                 f"No server URL configured for '{service_name}'",

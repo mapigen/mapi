@@ -1,18 +1,20 @@
 from __future__ import annotations
+
 import argparse
-from datetime import datetime, timezone
+import contextlib
 import logging
 import multiprocessing as mp
-from pathlib import Path
 import time
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import msgspec
 
 from .fetcher import fetch_specs_concurrently
 from .pipeline import run_processing_pipeline
 from .registry_builder import RegistryBuilder
-from .reporting import generate_auth_notice, generate_performance_report
+from .reporting import generate_performance_report
 from .utils import compress_zstd
 
 FORMAT_VERSION = 3
@@ -47,7 +49,7 @@ def load_configuration() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     for source, path in source_files.items():
         if path.exists():
             try:
-                entries = msgspec.yaml.decode(path.read_bytes(), type=List[Dict[str, Any]])
+                entries = msgspec.yaml.decode(path.read_bytes(), type=list[dict[str, Any]])
                 for entry in entries:
                     entry["source"] = source
                     all_sources.append(entry)
@@ -55,10 +57,8 @@ def load_configuration() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 log.error("Failed to parse %s: %s", path, e)
     overrides: dict[str, Any] = {}
     if OVERRIDES_PATH.exists():
-        try:
+        with contextlib.suppress(Exception):
             overrides = msgspec.json.decode(OVERRIDES_PATH.read_bytes())
-        except Exception:
-            pass
     return all_sources, overrides
 
 
@@ -68,10 +68,10 @@ def write_metadata(result: dict[str, Any], overrides: dict[str, Any], data_dir: 
     service_data_dir.mkdir(parents=True, exist_ok=True)
     metadata_yml_path = service_data_dir / "metadata.yml"
 
-    first_accessed_time = datetime.now(timezone.utc).isoformat()
+    first_accessed_time = datetime.now(UTC).isoformat()
     if metadata_yml_path.exists():
         try:
-            existing = msgspec.yaml.decode(metadata_yml_path.read_text(), type=Dict[str, Any])
+            existing = msgspec.yaml.decode(metadata_yml_path.read_text(), type=dict[str, Any])
             first_accessed_time = existing.get("first_accessed", first_accessed_time)
         except Exception:
             pass
@@ -83,7 +83,7 @@ def write_metadata(result: dict[str, Any], overrides: dict[str, Any], data_dir: 
     metadata_content = {
         "format_version": FORMAT_VERSION,
         "first_accessed": first_accessed_time,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "api_reference": result.get("url", ""),
         "status": result["status"],
         "operation_count": result.get("processed_op_count", 0),
@@ -108,11 +108,19 @@ def main():
     parser = argparse.ArgumentParser(description="Fetch and process API specifications.")
     parser.add_argument("--batch-size", type=int, default=25, help="Batch size for processing.")
     parser.add_argument("--download-workers", type=int, default=15, help="Download concurrency.")
-    parser.add_argument("--process-workers", type=int, default=mp.cpu_count(), help="Process concurrency.")
+    parser.add_argument(
+        "--process-workers", type=int, default=mp.cpu_count(), help="Process concurrency."
+    )
     parser.add_argument("--skip-download", action="store_true", help="Skip downloading new specs.")
-    parser.add_argument("--force-reprocess", action="store_true", help="Reprocess all cached specs.")
-    parser.add_argument("--no-compress-utilize", action="store_true", help="Do not compress utilize.json.")
-    parser.add_argument("--data-dir", type=Path, default=DATA_DIR, help="Destination data directory.")
+    parser.add_argument(
+        "--force-reprocess", action="store_true", help="Reprocess all cached specs."
+    )
+    parser.add_argument(
+        "--no-compress-utilize", action="store_true", help="Do not compress utilize.json."
+    )
+    parser.add_argument(
+        "--data-dir", type=Path, default=DATA_DIR, help="Destination data directory."
+    )
     args = parser.parse_args()
 
     overall_start = time.perf_counter()

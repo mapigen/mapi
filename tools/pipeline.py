@@ -1,10 +1,12 @@
 from __future__ import annotations
+
+import logging
+import time
+from collections.abc import Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import islice
-import logging
 from pathlib import Path
-import time
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any
 
 from .converter import normalize_spec
 from .extractor import extract_operations_and_components, save_metadata
@@ -20,13 +22,15 @@ def batcher(iterable: Iterable, batch_size: int) -> Iterator[list]:
         yield chunk
 
 
-def process_single_service(service_info: dict[str, Any], data_dir: Path, no_compress_utilize: bool = False) -> dict[str, Any]:
+def process_single_service(
+    service_info: dict[str, Any], data_dir: Path, no_compress_utilize: bool = False
+) -> dict[str, Any]:
     provider = service_info["provider"]
     api = service_info["api"]
     source = service_info["source"]
     url = service_info.get("url", "")
 
-    metrics: Dict[str, Any] = {"provider": provider, "api": api, "source": source, "url": url}
+    metrics: dict[str, Any] = {"provider": provider, "api": api, "source": source, "url": url}
     try:
         service_data_dir = data_dir / provider / source / api
         t_parse_start = time.perf_counter()
@@ -45,14 +49,18 @@ def process_single_service(service_info: dict[str, Any], data_dir: Path, no_comp
 
         utilize_path = save_metadata(api, processed_data, service_data_dir)
 
-        metrics.update({
-            "status": "success",
-            "auth_info": extract_auth_info(raw_spec),
-            "processed_op_count": len(processed_data["operations"]),
-            "reusable_param_count": len(processed_data.get("components", {}).get("parameters", {})),
-            "utilize_path": utilize_path,
-            "no_compress_utilize": no_compress_utilize,
-        })
+        metrics.update(
+            {
+                "status": "success",
+                "auth_info": extract_auth_info(raw_spec),
+                "processed_op_count": len(processed_data["operations"]),
+                "reusable_param_count": len(
+                    processed_data.get("components", {}).get("parameters", {})
+                ),
+                "utilize_path": utilize_path,
+                "no_compress_utilize": no_compress_utilize,
+            }
+        )
         return metrics
     except Exception as e:
         log.error("Failed to process service %s from %s: %s", api, source, e)
@@ -61,23 +69,25 @@ def process_single_service(service_info: dict[str, Any], data_dir: Path, no_comp
 
 
 def run_processing_pipeline(
-    services_to_process: List[Dict[str, Any]],
+    services_to_process: list[dict[str, Any]],
     data_dir: Path,
     process_workers: int = 4,
     batch_size: int = 25,
     no_compress_utilize: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     if not services_to_process:
         return []
 
     batches = list(batcher(services_to_process, batch_size))
     log.info("Processing %d services in %d batches...", len(services_to_process), len(batches))
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     for batch in batches:
         with ProcessPoolExecutor(max_workers=process_workers) as executor:
             futures = {
-                executor.submit(process_single_service, service, data_dir, no_compress_utilize): service["api"]
+                executor.submit(
+                    process_single_service, service, data_dir, no_compress_utilize
+                ): service["api"]
                 for service in batch
             }
             for future in as_completed(futures):

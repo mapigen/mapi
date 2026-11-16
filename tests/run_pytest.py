@@ -1,5 +1,6 @@
-import pytest
 import sys
+
+import pytest
 
 if __name__ == "__main__":
     # This script is an entrypoint for the profiler.

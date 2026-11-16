@@ -1,17 +1,15 @@
 from __future__ import annotations
+
 import argparse
 import logging
-from pathlib import Path
 import sys
-import time
+from pathlib import Path
 
-import msgspec
 import yaml
 
 from mapi.models.domain import Parameter, ParameterRef, ServiceData
 from mapi.registry.discovery import DiscoveryService, RegistryManager
 from mapi.registry.loader import DiskLoader
-from .utils import count_openapi_operations, load_spec
 
 FORMAT_VERSION = 3
 log = logging.getLogger("mapi.tools.validate")
@@ -37,9 +35,10 @@ def validate_operations_and_refs(data: ServiceData, service_name: str) -> list[s
             if isinstance(param, ParameterRef):
                 if param.component_name not in components:
                     errors.append(f"Operation '{op_id}' has a broken $ref: '{param.ref}'")
-            elif isinstance(param, Parameter):
-                if not all([param.name, param.in_, param.schema_ is not None]):
-                    errors.append(f"Inline parameter in '{op_id}' is missing required fields.")
+            elif isinstance(param, Parameter) and not all(
+                [param.name, param.in_, param.schema_ is not None]
+            ):
+                errors.append(f"Inline parameter in '{op_id}' is missing required fields.")
     return errors
 
 

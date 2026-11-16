@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock
 
 from mapi.cache import ServiceCache
@@ -26,9 +27,7 @@ class TestServiceCache:
         loader.load_service.assert_called_once()
 
     def test_pinned_key_never_evicted(self, sample_service_data):
-        cache, loader = self._create_cache(
-            sample_service_data, pinned=frozenset(["p:a:s"])
-        )
+        cache, loader = self._create_cache(sample_service_data, pinned=frozenset(["p:a:s"]))
         cache.get("p", "a", "s")
         cache.get("p", "a", "s")
         loader.load_service.assert_called_once_with("p", "a", "s")

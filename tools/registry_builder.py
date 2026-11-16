@@ -1,7 +1,8 @@
 from __future__ import annotations
-from datetime import datetime, timezone
+
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import msgspec
@@ -64,11 +65,13 @@ class RegistryBuilder:
                                 existing.sources.append(source_name)
 
                     except Exception as e:
-                        log.warning("Skipping %s/%s/%s: %s", provider_name, source_name, api_name, e)
+                        log.warning(
+                            "Skipping %s/%s/%s: %s", provider_name, source_name, api_name, e
+                        )
 
         return ServiceRegistry(
             version="2.0",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
             providers=providers,
         )
 

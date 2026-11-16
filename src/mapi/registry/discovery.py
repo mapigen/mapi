@@ -1,11 +1,11 @@
 from __future__ import annotations
+
 import logging
 import threading
-from typing import Optional
 
+from ..exceptions import ServiceNotFoundError
 from ..models.domain import Operation
 from ..models.registry import ApiInfo, ServiceRegistry
-from ..exceptions import ServiceNotFoundError
 from .loader import DiskLoader
 
 log = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class RegistryManager:
 
     def __init__(self, loader: DiskLoader) -> None:
         self._loader = loader
-        self._registry: Optional[ServiceRegistry] = None
+        self._registry: ServiceRegistry | None = None
         self._lock = threading.Lock()
 
     @property
@@ -39,7 +39,7 @@ class RegistryManager:
 class DiscoveryService:
     """
     Provider/API/operation discovery service.
-    
+
     Replaces mapigen's DiscoveryClient (which used static methods and module-level
     lru_cache) with an injectable, testable service.
     """
@@ -63,8 +63,7 @@ class DiscoveryService:
 
     def api_exists(self, provider: str, api: str) -> bool:
         return (
-            provider in self._rm.registry.providers
-            and api in self._rm.registry.providers[provider]
+            provider in self._rm.registry.providers and api in self._rm.registry.providers[provider]
         )
 
     def get_api_info(self, provider: str, api: str) -> ApiInfo:
@@ -76,7 +75,7 @@ class DiscoveryService:
             )
         return api_info
 
-    def _resolve_source(self, provider: str, api: str, source: Optional[str]) -> str:
+    def _resolve_source(self, provider: str, api: str, source: str | None) -> str:
         if source is not None:
             return source
         info = self.get_api_info(provider, api)
@@ -89,7 +88,7 @@ class DiscoveryService:
 
     # --- Operation level ---
 
-    def list_operations(self, provider: str, api: str, source: Optional[str] = None) -> list[str]:
+    def list_operations(self, provider: str, api: str, source: str | None = None) -> list[str]:
         src = self._resolve_source(provider, api, source)
         try:
             sd = self._loader.load_service(provider, api, src)
@@ -98,7 +97,7 @@ class DiscoveryService:
             return []
 
     def operation_exists(
-        self, provider: str, api: str, operation: str, source: Optional[str] = None
+        self, provider: str, api: str, operation: str, source: str | None = None
     ) -> bool:
         src = self._resolve_source(provider, api, source)
         try:
@@ -108,7 +107,7 @@ class DiscoveryService:
             return False
 
     def get_operation(
-        self, provider: str, api: str, operation: str, source: Optional[str] = None
+        self, provider: str, api: str, operation: str, source: str | None = None
     ) -> Operation:
         src = self._resolve_source(provider, api, source)
         sd = self._loader.load_service(provider, api, src)

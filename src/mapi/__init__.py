@@ -1,17 +1,18 @@
 """mapi — Universal API client SDK."""
-from .client import Mapi
-from .models.response import MapiResult, ResponseMetadata
+
 from .auth import ApiKeyAuth, BearerAuth
+from .client import Mapi
 from .exceptions import (
-    MapiError,
+    ClientError,
     ConfigurationError,
-    ServiceNotFoundError,
-    ValidationError,
-    TransportError,
+    MapiError,
     RateLimitError,
     ServerError,
-    ClientError,
+    ServiceNotFoundError,
+    TransportError,
+    ValidationError,
 )
+from .models.response import MapiResult, ResponseMetadata
 
 __version__ = "0.1.0"
 

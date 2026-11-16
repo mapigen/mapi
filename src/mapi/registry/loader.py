@@ -1,15 +1,15 @@
 from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import msgspec
 import zstandard as zstd
 
+from ..exceptions import ConfigurationError, ServiceNotFoundError
 from ..models.domain import ServiceData
 from ..models.registry import ServiceRegistry
-from ..exceptions import ConfigurationError, ServiceNotFoundError
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +38,8 @@ class DiskLoader:
 
     def __init__(
         self,
-        data_dir: Optional[Path] = None,
-        registry_path: Optional[Path] = None,
+        data_dir: Path | None = None,
+        registry_path: Path | None = None,
     ) -> None:
         self.data_dir = data_dir or _default_data_dir()
         self.registry_path = registry_path or _default_registry_path()
@@ -72,8 +72,7 @@ class DiskLoader:
             return self._service_decoder.decode(self._dctx.decompress(compressed.read_bytes()))
 
         raise ServiceNotFoundError(
-            f"Service data for '{provider}/{api}/{source}' not found. "
-            f"Expected at {service_dir}",
+            f"Service data for '{provider}/{api}/{source}' not found. Expected at {service_dir}",
             service=f"{provider}/{api}/{source}",
         )
 

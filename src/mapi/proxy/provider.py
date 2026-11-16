@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,7 +10,7 @@ from .api import ApiProxy
 class ProviderProxy:
     """
     Proxy representing a specific provider.
-    
+
     Attribute access dynamically resolves to an ApiProxy:
         client.pokeapi.REST -> ApiProxy for provider="pokeapi", api="REST"
     """

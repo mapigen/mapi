@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import niquests
 from niquests.auth import AuthBase
@@ -14,7 +15,7 @@ log = logging.getLogger(__name__)
 class NiquestsTransport:
     """
     HTTP transport backed by niquests.
-    
+
     - Sync: reuses a single Session for connection pooling.
     - Async: lazily creates one AsyncSession and reuses it across requests.
     - Context manager support for automatic cleanup.
@@ -23,10 +24,10 @@ class NiquestsTransport:
     def __init__(self, **session_kwargs: Any) -> None:
         self._kwargs = session_kwargs
         self._sync_session = niquests.Session(**session_kwargs)
-        self._async_session: Optional[niquests.AsyncSession] = None
+        self._async_session: niquests.AsyncSession | None = None
 
     @staticmethod
-    def _prepare_kwargs(config: RequestConfig, auth: Optional[AuthBase] = None) -> dict[str, Any]:
+    def _prepare_kwargs(config: RequestConfig, auth: AuthBase | None = None) -> dict[str, Any]:
         kw: dict[str, Any] = {"timeout": config.timeout}
         if config.params:
             kw["params"] = config.params
@@ -40,7 +41,7 @@ class NiquestsTransport:
 
     # --- Sync ---
 
-    def request(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response:
+    def request(self, config: RequestConfig, auth: AuthBase | None = None) -> Response:
         log.debug("sync %s %s", config.method, config.url)
         kw = self._prepare_kwargs(config, auth)
         response: Response = self._sync_session.request(config.method, config.url, **kw)
@@ -52,7 +53,7 @@ class NiquestsTransport:
 
     # --- Async ---
 
-    async def arequest(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response:
+    async def arequest(self, config: RequestConfig, auth: AuthBase | None = None) -> Response:
         log.debug("async %s %s", config.method, config.url)
         if self._async_session is None:
             self._async_session = niquests.AsyncSession(**self._kwargs)
@@ -68,13 +69,13 @@ class NiquestsTransport:
 
     # --- Context managers ---
 
-    def __enter__(self) -> "NiquestsTransport":
+    def __enter__(self) -> NiquestsTransport:
         return self
 
     def __exit__(self, *_: Any) -> None:
         self.close()
 
-    async def __aenter__(self) -> "NiquestsTransport":
+    async def __aenter__(self) -> NiquestsTransport:
         return self
 
     async def __aexit__(self, *_: Any) -> None:

@@ -1,13 +1,13 @@
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from itertools import islice
-import json
+
 import logging
-import os
-from pathlib import Path
 import re
 import time
-from typing import Any, Dict, Iterable, Iterator, List
+from collections.abc import Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import islice
+from pathlib import Path
+from typing import Any
 
 import msgspec
 import niquests
@@ -33,11 +33,15 @@ def fetch_single_spec(
     data_dir: Path,
     force_reprocess: bool = False,
     no_compress_original: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     service_data_dir = data_dir / provider / source / api
     spec_path_zst = service_data_dir / f"{api}.openapi.json.zst"
 
-    if not force_reprocess and (service_data_dir / "metadata.yml").exists() and spec_path_zst.exists():
+    if (
+        not force_reprocess
+        and (service_data_dir / "metadata.yml").exists()
+        and spec_path_zst.exists()
+    ):
         return {"status": "skipped", "provider": provider, "api": api, "source": source}
 
     headers = {"User-Agent": "mapi-builder/1.0"}
@@ -49,7 +53,13 @@ def fetch_single_spec(
         download_duration = time.perf_counter() - t_start
 
         if not content:
-            return {"status": "failure", "provider": provider, "api": api, "source": source, "reason": "No content"}
+            return {
+                "status": "failure",
+                "provider": provider,
+                "api": api,
+                "source": source,
+                "reason": "No content",
+            }
 
         if url.endswith((".yaml", ".yml")):
             data = msgspec.yaml.decode(content)
@@ -71,45 +81,53 @@ def fetch_single_spec(
         }
     except Exception as e:
         log.error("Failed to download %s from %s: %s", api, source, e)
-        return {"status": "failure", "provider": provider, "api": api, "source": source, "reason": str(e)}
+        return {
+            "status": "failure",
+            "provider": provider,
+            "api": api,
+            "source": source,
+            "reason": str(e),
+        }
 
 
-def batcher(iterable: Iterable, batch_size: int) -> Iterator[List[Any]]:
+def batcher(iterable: Iterable, batch_size: int) -> Iterator[list[Any]]:
     iterator = iter(iterable)
     while chunk := list(islice(iterator, batch_size)):
         yield chunk
 
 
 def fetch_specs_concurrently(
-    sources: List[Dict[str, Any]],
+    sources: list[dict[str, Any]],
     batch_size: int,
     data_dir: Path,
     download_workers: int = 25,
     force_reprocess: bool = False,
     no_compress_original: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     if not sources:
         return []
     log.info("Downloading %d specs in batches of %d...", len(sources), batch_size)
-    all_results: List[Dict[str, Any]] = []
+    all_results: list[dict[str, Any]] = []
 
     for batch in batcher(sources, batch_size):
-        with niquests.Session() as session:
-            with ThreadPoolExecutor(max_workers=download_workers) as executor:
-                futures = {
-                    executor.submit(
-                        fetch_single_spec,
-                        entry["provider"],
-                        entry["api"],
-                        entry["source"],
-                        entry["url"],
-                        session,
-                        data_dir,
-                        force_reprocess,
-                        no_compress_original,
-                    ): entry["api"]
-                    for entry in batch
-                }
-                for future in as_completed(futures):
-                    all_results.append(future.result())
+        with (
+            niquests.Session() as session,
+            ThreadPoolExecutor(max_workers=download_workers) as executor,
+        ):
+            futures = {
+                executor.submit(
+                    fetch_single_spec,
+                    entry["provider"],
+                    entry["api"],
+                    entry["source"],
+                    entry["url"],
+                    session,
+                    data_dir,
+                    force_reprocess,
+                    no_compress_original,
+                ): entry["api"]
+                for entry in batch
+            }
+            for future in as_completed(futures):
+                all_results.append(future.result())
     return all_results

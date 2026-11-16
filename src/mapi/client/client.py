@@ -1,9 +1,11 @@
 from __future__ import annotations
-from datetime import datetime, timezone
+
 import logging
 import time
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Awaitable, Callable, NoReturn, Optional, TypeVar, Union
+from typing import Any, NoReturn, TypeVar
 
 import msgspec
 from niquests.auth import AuthBase
@@ -35,7 +37,7 @@ T = TypeVar("T")
 
 def _utc_now_iso() -> str:
     """Return ISO 8601 UTC timestamp."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _to_ms(seconds: float) -> int:
@@ -58,7 +60,7 @@ async def _ameasure(coro: Awaitable[T]) -> tuple[T, float]:
 def _build_result(
     service_name: str,
     operation: str,
-    status_code: int,
+    status_code: int | None,
     data: Any,
     ops_time: float,
     net_time: float,
@@ -128,12 +130,12 @@ class Mapi:
 
     def __init__(
         self,
-        config: Optional[ClientConfig] = None,
-        auth: Optional[Union[AuthBase, str]] = None,
-        transport: Optional[NiquestsTransport] = None,
-        data_dir: Optional[Path] = None,
-        registry_path: Optional[Path] = None,
-        base_url: Optional[str] = None,
+        config: ClientConfig | None = None,
+        auth: AuthBase | str | None = None,
+        transport: NiquestsTransport | None = None,
+        data_dir: Path | None = None,
+        registry_path: Path | None = None,
+        base_url: str | None = None,
         **transport_kwargs: Any,
     ) -> None:
         cfg = config or ClientConfig()
@@ -149,7 +151,7 @@ class Mapi:
 
         if isinstance(auth, str):
             auth = BearerAuth(auth)
-        self._auth: Optional[AuthBase] = auth
+        self._auth: AuthBase | None = auth
 
         self._loader = DiskLoader(data_dir=data_dir, registry_path=registry_path)
         self._registry_mgr = RegistryManager(self._loader)
@@ -238,9 +240,7 @@ class Mapi:
             self._prepare_request, provider, api, source, operation, kwargs
         )
         try:
-            response, net_time = await _ameasure(
-                self._transport.arequest(config, auth=self._auth)
-            )
+            response, net_time = await _ameasure(self._transport.arequest(config, auth=self._auth))
             data, post_time = _measure(self._decode_response, response)
             return _build_result(
                 service_name, operation, response.status_code, data, prep_time + post_time, net_time
@@ -256,13 +256,13 @@ class Mapi:
 
     # --- Context Managers ---
 
-    def __enter__(self) -> "Mapi":
+    def __enter__(self) -> Mapi:
         return self
 
     def __exit__(self, *_: Any) -> None:
         self._transport.close()
 
-    async def __aenter__(self) -> "Mapi":
+    async def __aenter__(self) -> Mapi:
         return self
 
     async def __aexit__(self, *_: Any) -> None:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -50,9 +51,12 @@ def count_openapi_operations(spec: dict[str, Any]) -> int:
         if not isinstance(path_item, dict):
             continue
         for method_name, operation_details in path_item.items():
-            if method_name.lower() in VALID_METHODS and isinstance(operation_details, dict):
-                if operation_details.get("operationId"):
-                    count += 1
+            if (
+                method_name.lower() in VALID_METHODS
+                and isinstance(operation_details, dict)
+                and operation_details.get("operationId")
+            ):
+                count += 1
     return count
 
 

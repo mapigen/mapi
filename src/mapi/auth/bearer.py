@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from niquests.auth import AuthBase
 from niquests.models import PreparedRequest
+from niquests.structures import CaseInsensitiveDict
 
 
 class BearerAuth(AuthBase):
@@ -14,7 +16,7 @@ class BearerAuth(AuthBase):
 
     def __call__(self, r: PreparedRequest) -> PreparedRequest:
         if r.headers is None:
-            r.headers = {}
+            r.headers = CaseInsensitiveDict()
         r.headers["Authorization"] = f"{self.scheme} {self.token}"
         return r
 

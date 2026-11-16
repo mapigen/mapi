@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 import hashlib
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import msgspec
 
-from .utils import get_params_from_operation, VALID_METHODS
+from .utils import VALID_METHODS, get_params_from_operation
 
 
 def get_param_fingerprint(param: dict[str, Any]) -> str:
@@ -26,7 +27,7 @@ def extract_operations_and_components(service: str, spec: dict[str, Any]) -> dic
     if not isinstance(paths, dict):
         return {"components": {"parameters": {}, "schemas": {}}, "operations": {}}
 
-    for path, methods_dict in paths.items():
+    for _path, methods_dict in paths.items():
         if not isinstance(methods_dict, dict):
             continue
 
@@ -35,7 +36,7 @@ def extract_operations_and_components(service: str, spec: dict[str, Any]) -> dic
             if method.lower() not in VALID_METHODS or not isinstance(details_dict, dict):
                 continue
 
-            op_id: Optional[str] = details_dict.get("operationId")
+            op_id: str | None = details_dict.get("operationId")
             if not op_id:
                 continue
 
@@ -72,10 +73,12 @@ def extract_operations_and_components(service: str, spec: dict[str, Any]) -> dic
                 if fingerprint in seen:
                     continue
                 seen.add(fingerprint)
-                final_params.append({
-                    "type": "ref",
-                    "$ref": f"#/components/parameters/{fingerprint}",
-                })
+                final_params.append(
+                    {
+                        "type": "ref",
+                        "$ref": f"#/components/parameters/{fingerprint}",
+                    }
+                )
 
             operations[op_id] = {
                 "service": service,

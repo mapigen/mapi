@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..client.client import Mapi
@@ -25,7 +26,7 @@ class ApiProxy:
         client: Mapi,
         provider: str,
         api: str,
-        source: Optional[str] = None,
+        source: str | None = None,
     ) -> None:
         self._client = client
         self._provider = provider
@@ -42,7 +43,7 @@ class ApiProxy:
         source = self._resolve_source()
         return await self._client.aexecute(self._provider, self._api, source, operation, **kwargs)
 
-    def __getattr__(self, source_name: str) -> "ApiProxy":
+    def __getattr__(self, source_name: str) -> ApiProxy:
         """Return a new ApiProxy scoped to the specified source."""
         info = self._client._discovery.get_api_info(self._provider, self._api)
         if source_name not in info.sources:
@@ -57,9 +58,7 @@ class ApiProxy:
             return self._source
         info = self._client._discovery.get_api_info(self._provider, self._api)
         if not info.sources:
-            raise AttributeError(
-                f"No sources configured for API '{self._provider}/{self._api}'"
-            )
+            raise AttributeError(f"No sources configured for API '{self._provider}/{self._api}'")
         self._source = info.sources[0]
         return self._source
 

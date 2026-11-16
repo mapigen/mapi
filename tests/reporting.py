@@ -1,31 +1,37 @@
 from __future__ import annotations
+
 import json
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, List, Dict
-from dataclasses import asdict
+from typing import Any
 
 import msgspec
+
 from mapi import Mapi, MapiError
-from .helpers import result_reporter, VALID_CALL_4XX
+
+from .helpers import VALID_CALL_4XX, result_reporter
 
 # This dictionary is the single source of truth for which credentials
 # are needed for each integration test.
-REQUIRED_CREDS: Dict[str, List[str]] = {
+REQUIRED_CREDS: dict[str, list[str]] = {
     "discord": ["DISCORD_BOT_TOKEN", "TEST_CHANNEL_ID", "DISCORD_MESSAGE_ID"],
     "github": ["GITHUB_TOKEN", "TEST_GITHUB_USER"],
     "pokeapi": [],  # No specific credentials required for basic PokeAPI tests
 }
 
 # This dictionary controls which services will have their payloads saved to tmp/.
-SAVE_PAYLOAD_TOGGLE: Dict[str, bool] = {
+SAVE_PAYLOAD_TOGGLE: dict[str, bool] = {
     "discord": True,
     "github": True,
     "pokeapi": True,
     "REST": True,
 }
 
-def _save_payload_if_enabled(provider_name: str, api_name: str, op_name: str, response_wrapper: Any) -> str | None:
+
+def _save_payload_if_enabled(
+    provider_name: str, api_name: str, op_name: str, response_wrapper: Any
+) -> str | None:
     """Checks the toggle and saves the full response payload if enabled."""
     if SAVE_PAYLOAD_TOGGLE.get(provider_name, False) or SAVE_PAYLOAD_TOGGLE.get(api_name, False):
         tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
@@ -36,7 +42,7 @@ def _save_payload_if_enabled(provider_name: str, api_name: str, op_name: str, re
         file_path = tmp_dir / f"{provider_name}_{api_name}_{safe_op_name}_response.json"
 
         # Prepare data for serialization
-        data_to_save: Dict[str, Any] = {}
+        data_to_save: dict[str, Any] = {}
         if hasattr(response_wrapper, "metadata") and response_wrapper.metadata is not None:
             meta = response_wrapper.metadata
             data_to_save["metadata"] = msgspec.to_builtins(meta)
@@ -50,12 +56,13 @@ def _save_payload_if_enabled(provider_name: str, api_name: str, op_name: str, re
         return str(file_path)
     return None
 
+
 def run_test_operation(
     client: Mapi,
     provider_name: str,
     api_name: str,
     op_name: str,
-    operations_checked: List[str],
+    operations_checked: list[str],
     assertion_callback: Callable[[Any], None],
     **kwargs: Any,
 ):
@@ -82,18 +89,20 @@ def run_test_operation(
         if metadata and getattr(metadata, "status", None) == "success":
             assertion_callback(data)
             result_reporter.add_passed(service_key, op_name, getattr(metadata, "duration_ms", 0))
-        elif (metadata and getattr(metadata, "http_status", None) in VALID_CALL_4XX) or (metadata and getattr(metadata, "error_type", None) == "validation"):
+        elif (metadata and getattr(metadata, "http_status", None) in VALID_CALL_4XX) or (
+            metadata and getattr(metadata, "error_type", None) == "validation"
+        ):
             error = MapiError(
-                f"Expected client error: {getattr(metadata, 'http_status', None) or getattr(metadata, 'error_type', None)}", 
-                service=service_key, 
+                f"Expected client error: {getattr(metadata, 'http_status', None) or getattr(metadata, 'error_type', None)}",
+                service=service_key,
                 operation=op_name,
             )
             result_reporter.add_http_validated_call(service_key, op_name, error)
         else:
-            error_type = getattr(metadata, 'error_type', 'Unknown') if metadata else 'Unknown'
+            error_type = getattr(metadata, "error_type", "Unknown") if metadata else "Unknown"
             error = MapiError(
-                f"Unexpected error: {error_type}", 
-                service=service_key, 
+                f"Unexpected error: {error_type}",
+                service=service_key,
                 operation=op_name,
             )
             result_reporter.add_failed(service_key, op_name, error)
@@ -105,5 +114,5 @@ def run_test_operation(
         traceback.print_exc()
         error = MapiError(f"Unhandled exception: {e}", service=service_key, operation=op_name)
         result_reporter.add_failed(service_key, op_name, error)
-    
+
     operations_checked.append(op_name)

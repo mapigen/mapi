@@ -1,11 +1,14 @@
 # tests/conftest.py
 from __future__ import annotations
-import pytest
+
 import msgspec
+import pytest
 
 from mapi.models import (
-    ServiceData, Components, Server, Operation, Parameter, ParameterRef,
-    ServiceRegistry, ApiInfo,
+    ApiInfo,
+    Parameter,
+    ServiceData,
+    ServiceRegistry,
 )
 
 
@@ -38,7 +41,13 @@ def sample_service_data() -> ServiceData:
                 "path": "/users/{user_id}",
                 "method": "GET",
                 "parameters": [
-                    {"type": "inline", "name": "user_id", "in": "path", "schema": {"type": "integer"}, "required": True},
+                    {
+                        "type": "inline",
+                        "name": "user_id",
+                        "in": "path",
+                        "schema": {"type": "integer"},
+                        "required": True,
+                    },
                     {"type": "ref", "$ref": "#/components/parameters/abc123"},
                 ],
             }

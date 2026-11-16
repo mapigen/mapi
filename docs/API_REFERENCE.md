@@ -17,12 +17,7 @@ You initialize the client by creating an instance of the `Mapi` class.
 ```python
 from mapigen import Mapi
 
-mapi = Mapi(
-    auth=None, 
-    default_timeout=30.0, 
-    log_level="INFO", 
-    validate_on_execute=True
-)
+mapi = Mapi(auth=None, default_timeout=30.0, log_level="INFO", validate_on_execute=True)
 ```
 
 **Constructor: `Mapi(auth, default_timeout, log_level, validate_on_execute, **transport_kwargs)`**
@@ -42,13 +37,13 @@ This is the recommended, IDE-friendly method for calling API operations.
 -   **Synchronous:**
     ```python
     # Returns a dict: {"data": ..., "metadata": ...}
-    response = mapi.pokeapi.api_v2_pokemon_retrieve(id='ditto')
+    response = mapi.pokeapi.api_v2_pokemon_retrieve(id="ditto")
     ```
 -   **Asynchronous:** Asynchronous operations are powered by `niquests`.
     ```python
     # This must be run inside an async function
     async def fetch_pokemon():
-        response = await mapi.pokeapi.api_v2_pokemon_retrieve.aexecute(id='ditto')
+        response = await mapi.pokeapi.api_v2_pokemon_retrieve.aexecute(id="ditto")
         return response
     ```
 
@@ -67,11 +62,12 @@ These methods are ideal for dynamic scenarios where the service and operation na
 **Example:**
 ```python
 # Sync
-response = mapi.execute('pokeapi', 'api_v2_pokemon_retrieve', id='pikachu')
+response = mapi.execute("pokeapi", "api_v2_pokemon_retrieve", id="pikachu")
+
 
 # Async
 async def fetch_pikachu_async():
-    async_response = await mapi.aexecute('pokeapi', 'api_v2_pokemon_retrieve', id='pikachu')
+    async_response = await mapi.aexecute("pokeapi", "api_v2_pokemon_retrieve", id="pikachu")
     return async_response
 ```
 
@@ -87,11 +83,11 @@ The `mapi.discovery` property provides access to a `DiscoveryClient` instance fo
 
 **Example:**
 ```python
-if mapi.discovery.service_exists('github'):
-    info = mapi.discovery.get_service_info('github')
+if mapi.discovery.service_exists("github"):
+    info = mapi.discovery.get_service_info("github")
     print(f"GitHub has {info.operation_count} operations.")
 
-    operations = mapi.discovery.list_operations('github')
+    operations = mapi.discovery.list_operations("github")
     print(f"First 5 operations: {operations[:5]}")
 ```
 
@@ -107,7 +103,7 @@ from niquests.auth import HTTPBasicAuth
 from mapigen import Mapi
 
 # Use a standard auth object from the underlying http library
-basic_auth = HTTPBasicAuth('user', 'pass')
+basic_auth = HTTPBasicAuth("user", "pass")
 
 mapi = Mapi(auth=basic_auth)
 ```
