@@ -7,6 +7,7 @@ import niquests
 from niquests.auth import AuthBase
 from niquests.models import Response
 
+from ..constants import HTTP_METHOD_GET, HTTP_METHOD_HEAD
 from ..models.request import RequestConfig
 
 log = logging.getLogger(__name__)
@@ -45,7 +46,10 @@ class NiquestsTransport:
             kw["params"] = config.params
         if config.headers:
             kw["headers"] = config.headers
-        if config.json_body is not None and config.method not in ("GET", "HEAD"):
+        if config.json_body is not None and config.method not in (
+            HTTP_METHOD_GET,
+            HTTP_METHOD_HEAD,
+        ):
             kw["json"] = config.json_body
         if auth is not None:
             kw["auth"] = auth

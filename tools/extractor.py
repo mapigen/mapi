@@ -105,8 +105,8 @@ def extract_operations_and_components(service: str, spec: dict[str, Any]) -> dic
 
 
 def save_metadata(service: str, data: dict[str, Any], out_dir: Path) -> Path:
-    """Save extracted metadata into a utilize.json file."""
+    """Save extracted metadata into a mapi.json file."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{service}.utilize.json"
+    path = out_dir / f"{service}.mapi.json"
     path.write_bytes(msgspec.json.encode(data))
     return path

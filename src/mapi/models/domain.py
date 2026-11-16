@@ -61,7 +61,7 @@ class Components(msgspec.Struct, frozen=True, gc=False):
 
 
 class ServiceData(msgspec.Struct, frozen=True, gc=False):
-    """Complete processed service definition (from utilize.json)."""
+    """Complete processed service definition (from mapi.json)."""
 
     format_version: Annotated[int, Meta(ge=3)]
     service_name: NonEmptyStr

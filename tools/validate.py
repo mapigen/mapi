@@ -87,7 +87,7 @@ def main():
                     if meta.get("format_version") != FORMAT_VERSION:
                         raise ValueError(f"Incorrect format_version (expected {FORMAT_VERSION})")
 
-                    # 2. utilize data check
+                    # 2. mapi data check
                     service_data = loader.load_service(provider, api, source)
                     errors = validate_operations_and_refs(service_data, service_name)
                     if errors:

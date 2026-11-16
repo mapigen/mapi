@@ -55,6 +55,6 @@ def test_process_single_service_failure(tmp_path: Path):
         "url": "http://localhost/corrupted.json",
     }
     result = pipeline.process_single_service(
-        service_info, tmp_path / "data", no_compress_utilize=True
+        service_info, tmp_path / "data", no_compress_mapi=True
     )
     assert result["status"] == "failure"

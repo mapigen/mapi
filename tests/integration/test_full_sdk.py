@@ -25,10 +25,10 @@ def mock_sdk_environment(
     # Write mapi-registry.json
     registry_path.write_bytes(msgspec.json.encode(sample_registry))
 
-    # Write pokeapi/openapi/REST/REST.utilize.json
+    # Write pokeapi/openapi/REST/REST.mapi.json
     service_dir = data_dir / "pokeapi" / "openapi" / "REST"
     service_dir.mkdir(parents=True, exist_ok=True)
-    (service_dir / "REST.utilize.json").write_bytes(msgspec.json.encode(sample_service_data))
+    (service_dir / "REST.mapi.json").write_bytes(msgspec.json.encode(sample_service_data))
 
     return data_dir, registry_path
 

@@ -11,6 +11,21 @@ from typing import TYPE_CHECKING, Any, NoReturn, TypeVar
 import msgspec
 from niquests.exceptions import ConnectionError, HTTPError, Timeout
 
+from ..constants import (
+    DEFAULT_SOURCE,
+    FLAG_DRY_RUN,
+    FLAG_DRY_RUN_ALT,
+    FLAG_IDEMPOTENT,
+    FLAG_IDEMPOTENT_ALT,
+    FLAG_RAW,
+    FLAG_RAW_ALT,
+    FLAG_STREAM,
+    FLAG_STREAM_ALT,
+    FLAG_TARGET_TYPE,
+    FLAG_TYPE,
+    STATUS_DRY_RUN,
+    STATUS_SUCCESS,
+)
 from ..exceptions import (
     ClientError,
     RateLimitError,
@@ -61,7 +76,7 @@ def _build_result(
     ops_time: float,
     net_time: float,
     headers: dict[str, str] | None = None,
-    status: Any = "success",
+    status: Any = STATUS_SUCCESS,
 ) -> MapiResult:
     """Construct an immutable MapiResult with isolated ops vs network telemetry."""
     return MapiResult(
@@ -121,30 +136,30 @@ def _extract_call_flags(
     stream = _stream
 
     if kwargs:
-        if "_type" in kwargs:
-            target_type = kwargs.pop("_type")
-        elif "target_type" in kwargs:
-            target_type = kwargs.pop("target_type")
+        if FLAG_TYPE in kwargs:
+            target_type = kwargs.pop(FLAG_TYPE)
+        elif FLAG_TARGET_TYPE in kwargs:
+            target_type = kwargs.pop(FLAG_TARGET_TYPE)
 
-        if "_raw" in kwargs:
-            raw = raw or bool(kwargs.pop("_raw"))
-        elif "raw" in kwargs:
-            raw = raw or bool(kwargs.pop("raw"))
+        if FLAG_RAW in kwargs:
+            raw = raw or bool(kwargs.pop(FLAG_RAW))
+        elif FLAG_RAW_ALT in kwargs:
+            raw = raw or bool(kwargs.pop(FLAG_RAW_ALT))
 
-        if "_dry_run" in kwargs:
-            dry_run = dry_run or bool(kwargs.pop("_dry_run"))
-        elif "dry_run" in kwargs:
-            dry_run = dry_run or bool(kwargs.pop("dry_run"))
+        if FLAG_DRY_RUN in kwargs:
+            dry_run = dry_run or bool(kwargs.pop(FLAG_DRY_RUN))
+        elif FLAG_DRY_RUN_ALT in kwargs:
+            dry_run = dry_run or bool(kwargs.pop(FLAG_DRY_RUN_ALT))
 
-        if "_idempotent" in kwargs:
-            idempotent = idempotent or bool(kwargs.pop("_idempotent"))
-        elif "idempotent" in kwargs:
-            idempotent = idempotent or bool(kwargs.pop("idempotent"))
+        if FLAG_IDEMPOTENT in kwargs:
+            idempotent = idempotent or bool(kwargs.pop(FLAG_IDEMPOTENT))
+        elif FLAG_IDEMPOTENT_ALT in kwargs:
+            idempotent = idempotent or bool(kwargs.pop(FLAG_IDEMPOTENT_ALT))
 
-        if "_stream" in kwargs:
-            stream = stream or bool(kwargs.pop("_stream"))
-        elif "stream" in kwargs:
-            stream = stream or bool(kwargs.pop("stream"))
+        if FLAG_STREAM in kwargs:
+            stream = stream or bool(kwargs.pop(FLAG_STREAM))
+        elif FLAG_STREAM_ALT in kwargs:
+            stream = stream or bool(kwargs.pop(FLAG_STREAM_ALT))
 
     return target_type, raw, dry_run, idempotent, stream
 
@@ -186,9 +201,9 @@ class RequestExecutor:
         if source is None:
             try:
                 info = self._client._discovery.get_api_info(provider, api)
-                source = info.sources[0] if info.sources else "openapi"
+                source = info.sources[0] if info.sources else DEFAULT_SOURCE
             except Exception:
-                source = "openapi"
+                source = DEFAULT_SOURCE
 
         service_name = f"{provider}/{api}/{source}"
         cfg = self._client._config
@@ -276,7 +291,7 @@ class RequestExecutor:
                     duration_ms=_to_ms(prep_time),
                     network_duration_ms=0,
                     headers=HeadersDict(config.headers),
-                    status="dry_run",
+                    status=STATUS_DRY_RUN,
                     http_status=None,
                     timestamp=_utc_now_iso(),
                 ),
@@ -346,7 +361,7 @@ class RequestExecutor:
                     duration_ms=_to_ms(prep_time),
                     network_duration_ms=0,
                     headers=HeadersDict(config.headers),
-                    status="dry_run",
+                    status=STATUS_DRY_RUN,
                     http_status=None,
                     timestamp=_utc_now_iso(),
                 ),

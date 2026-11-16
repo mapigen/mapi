@@ -23,7 +23,7 @@ def batcher(iterable: Iterable, batch_size: int) -> Iterator[list]:
 
 
 def process_single_service(
-    service_info: dict[str, Any], data_dir: Path, no_compress_utilize: bool = False
+    service_info: dict[str, Any], data_dir: Path, no_compress_mapi: bool = False
 ) -> dict[str, Any]:
     provider = service_info["provider"]
     api = service_info["api"]
@@ -47,7 +47,7 @@ def process_single_service(
         processed_data["format_version"] = FORMAT_VERSION
         processed_data["service_name"] = api
 
-        utilize_path = save_metadata(api, processed_data, service_data_dir)
+        mapi_path = save_metadata(api, processed_data, service_data_dir)
 
         metrics.update(
             {
@@ -57,8 +57,8 @@ def process_single_service(
                 "reusable_param_count": len(
                     processed_data.get("components", {}).get("parameters", {})
                 ),
-                "utilize_path": utilize_path,
-                "no_compress_utilize": no_compress_utilize,
+                "mapi_path": mapi_path,
+                "no_compress_mapi": no_compress_mapi,
             }
         )
         return metrics
@@ -73,7 +73,7 @@ def run_processing_pipeline(
     data_dir: Path,
     process_workers: int = 4,
     batch_size: int = 25,
-    no_compress_utilize: bool = False,
+    no_compress_mapi: bool = False,
 ) -> list[dict[str, Any]]:
     if not services_to_process:
         return []
@@ -86,7 +86,7 @@ def run_processing_pipeline(
         with ProcessPoolExecutor(max_workers=process_workers) as executor:
             futures = {
                 executor.submit(
-                    process_single_service, service, data_dir, no_compress_utilize
+                    process_single_service, service, data_dir, no_compress_mapi
                 ): service["api"]
                 for service in batch
             }

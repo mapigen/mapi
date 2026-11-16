@@ -23,10 +23,10 @@ def _write_service_data(
     service_dir.mkdir(parents=True, exist_ok=True)
     payload = msgspec.json.encode(service_data)
     if compressed:
-        target = service_dir / f"{api}.utilize.json.zst"
+        target = service_dir / f"{api}.mapi.json.zst"
         target.write_bytes(zstd.ZstdCompressor().compress(payload))
     else:
-        target = service_dir / f"{api}.utilize.json"
+        target = service_dir / f"{api}.mapi.json"
         target.write_bytes(payload)
     return target
 
@@ -39,14 +39,6 @@ class TestDiskLoader:
 
     def test_load_valid_registry(self, tmp_path, sample_registry):
         reg_file = tmp_path / "mapi-registry.json"
-        reg_file.write_bytes(msgspec.json.encode(sample_registry))
-        loader = DiskLoader(data_dir=tmp_path, registry_path=reg_file)
-        reg = loader.load_registry()
-        assert "pokeapi" in reg.providers
-        assert reg.version == "1.0"
-
-    def test_load_fallback_services_json(self, tmp_path, sample_registry):
-        reg_file = tmp_path / "services.json"
         reg_file.write_bytes(msgspec.json.encode(sample_registry))
         loader = DiskLoader(data_dir=tmp_path, registry_path=reg_file)
         reg = loader.load_registry()

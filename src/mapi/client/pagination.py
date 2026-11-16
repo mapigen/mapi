@@ -6,6 +6,16 @@ import urllib.parse
 from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING, Any
 
+from ..constants import (
+    HEADER_LINK_LOWER,
+    PAGINATION_CURSOR_KEYS,
+    PAGINATION_HAS_MORE,
+    PAGINATION_ITEM_KEYS,
+    PAGINATION_LIMIT,
+    PAGINATION_OFFSET,
+    PAGINATION_PAGE,
+    PAGINATION_STARTING_AFTER,
+)
 from ..models.response import MapiResult
 
 if TYPE_CHECKING:
@@ -92,7 +102,7 @@ class PaginationService:
         data = result.data
 
         # 1. Check Link header (RFC 5988: <url>; rel="next")
-        link_header = result.metadata.headers.get("link")
+        link_header = result.metadata.headers.get(HEADER_LINK_LOWER)
         if link_header:
             match = re.search(r'<([^>]+)>;\s*rel="next"', link_header, re.IGNORECASE)
             if match:
@@ -105,61 +115,61 @@ class PaginationService:
 
         # 2. Inspect dict data for cursors
         if isinstance(data, dict):
-            if data.get("has_more") is False:
+            if data.get(PAGINATION_HAS_MORE) is False:
                 return None
-            for cursor_key in ("next_cursor", "next_token", "cursor", "next"):
+            for cursor_key in PAGINATION_CURSOR_KEYS:
                 cursor_val = data.get(cursor_key)
                 if cursor_val and isinstance(cursor_val, str):
                     new_kwargs[cursor_key] = cursor_val
                     return new_kwargs
 
             items = None
-            for key in ("data", "items", "results"):
+            for key in PAGINATION_ITEM_KEYS:
                 if key in data and isinstance(data[key], list):
                     items = data[key]
                     break
 
-            if items and data.get("has_more") is True:
+            if items and data.get(PAGINATION_HAS_MORE) is True:
                 last_item = items[-1]
                 if isinstance(last_item, dict) and "id" in last_item:
-                    new_kwargs["starting_after"] = last_item["id"]
+                    new_kwargs[PAGINATION_STARTING_AFTER] = last_item["id"]
                     return new_kwargs
 
         # 3. Numeric page pagination
-        if "page" in current_kwargs and isinstance(current_kwargs["page"], int):
+        if PAGINATION_PAGE in current_kwargs and isinstance(current_kwargs[PAGINATION_PAGE], int):
             if isinstance(data, list) and len(data) == 0:
                 return None
             if isinstance(data, dict):
                 items = None
-                for key in ("data", "items", "results"):
+                for key in PAGINATION_ITEM_KEYS:
                     if key in data and isinstance(data[key], list):
                         items = data[key]
                         break
                 if items is not None and len(items) == 0:
                     return None
-            new_kwargs["page"] = current_kwargs["page"] + 1
+            new_kwargs[PAGINATION_PAGE] = current_kwargs[PAGINATION_PAGE] + 1
             return new_kwargs
 
         # 4. Offset pagination
-        if "offset" in current_kwargs and isinstance(current_kwargs["offset"], int):
-            limit = current_kwargs.get("limit", 20)
+        if PAGINATION_OFFSET in current_kwargs and isinstance(current_kwargs[PAGINATION_OFFSET], int):
+            limit = current_kwargs.get(PAGINATION_LIMIT, 20)
             if isinstance(data, list):
                 if len(data) == 0:
                     return None
-                new_kwargs["offset"] = current_kwargs["offset"] + len(data)
+                new_kwargs[PAGINATION_OFFSET] = current_kwargs[PAGINATION_OFFSET] + len(data)
                 return new_kwargs
             elif isinstance(data, dict):
                 items = None
-                for key in ("data", "items", "results"):
+                for key in PAGINATION_ITEM_KEYS:
                     if key in data and isinstance(data[key], list):
                         items = data[key]
                         break
                 if items is not None:
                     if len(items) == 0:
                         return None
-                    new_kwargs["offset"] = current_kwargs["offset"] + len(items)
+                    new_kwargs[PAGINATION_OFFSET] = current_kwargs[PAGINATION_OFFSET] + len(items)
                     return new_kwargs
-            new_kwargs["offset"] = current_kwargs["offset"] + limit
+            new_kwargs[PAGINATION_OFFSET] = current_kwargs[PAGINATION_OFFSET] + limit
             return new_kwargs
 
         return None

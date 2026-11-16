@@ -5,6 +5,7 @@ from typing import Any
 
 import msgspec
 
+from ..constants import SENSITIVE_AUTH_HEADERS
 from .domain import HttpMethod
 
 
@@ -36,7 +37,7 @@ class RequestConfig(msgspec.Struct, frozen=True, gc=False):
         parts = [f"curl -X {self.method} '{url}'"]
         for k, v in self.headers.items():
             val = v
-            if redact_auth and k.lower() in ("authorization", "x-api-key", "api-key", "token"):
+            if redact_auth and k.lower() in SENSITIVE_AUTH_HEADERS:
                 val = "[REDACTED]"
             parts.append(f"-H '{k}: {val}'")
 

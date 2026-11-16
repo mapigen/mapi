@@ -8,6 +8,17 @@ from typing import TYPE_CHECKING, Any
 import msgspec
 
 from ..cache.service_cache import ServiceCache
+from ..constants import (
+    DEFAULT_HEADERS,
+    FLAG_SERVER_PATTERN,
+    FLAG_SERVER_TAG,
+    HEADER_IDEMPOTENCY_KEY,
+    MUTATION_HTTP_METHODS,
+    PARAM_IN_BODY,
+    PARAM_IN_HEADER,
+    PARAM_IN_PATH,
+    PARAM_IN_QUERY,
+)
 from ..exceptions import ServiceNotFoundError
 from ..models.domain import Parameter, ParameterRef
 from ..models.request import RequestConfig
@@ -17,11 +28,6 @@ if TYPE_CHECKING:
     from ..cache.hot_cache import HotOpCache
 
 log = logging.getLogger(__name__)
-
-_DEFAULT_HEADERS: dict[str, str] = {
-    "User-Agent": "mapi/0.1.0",
-    "Accept": "application/json",
-}
 
 
 class RequestBuilder:
@@ -84,8 +90,8 @@ class RequestBuilder:
 
         # 3. Resolve server by tag/pattern or fallback
         effective_tag = None
-        if kwargs and ("server_tag" in kwargs or "server_pattern" in kwargs):
-            effective_tag = kwargs.pop("server_tag", None) or kwargs.pop("server_pattern", None)
+        if kwargs and (FLAG_SERVER_TAG in kwargs or FLAG_SERVER_PATTERN in kwargs):
+            effective_tag = kwargs.pop(FLAG_SERVER_TAG, None) or kwargs.pop(FLAG_SERVER_PATTERN, None)
         if not effective_tag:
             effective_tag = server_tag or server_pattern
 
@@ -131,17 +137,17 @@ class RequestBuilder:
         query_params: dict[str, Any] = {}
         body_params: dict[str, Any] = {}
         headers: dict[str, str] = (
-            {**_DEFAULT_HEADERS, **default_headers}
+            {**DEFAULT_HEADERS, **default_headers}
             if default_headers is not None
-            else dict(_DEFAULT_HEADERS)
+            else dict(DEFAULT_HEADERS)
         )
 
         if (
             idempotent
-            and op.method in ("POST", "PUT", "PATCH", "DELETE")
-            and "Idempotency-Key" not in headers
+            and op.method in MUTATION_HTTP_METHODS
+            and HEADER_IDEMPOTENCY_KEY not in headers
         ):
-            headers["Idempotency-Key"] = str(uuid.uuid4())
+            headers[HEADER_IDEMPOTENCY_KEY] = str(uuid.uuid4())
 
         for param_union in op.parameters:
             if isinstance(param_union, ParameterRef):
@@ -155,13 +161,13 @@ class RequestBuilder:
             value = kwargs[param.name]
             if isinstance(value, msgspec.Struct):
                 value = msgspec.to_builtins(value)
-            if param.in_ == "path":
+            if param.in_ == PARAM_IN_PATH:
                 path_params[param.name] = value
-            elif param.in_ == "query":
+            elif param.in_ == PARAM_IN_QUERY:
                 query_params[param.name] = value
-            elif param.in_ == "body":
+            elif param.in_ == PARAM_IN_BODY:
                 body_params[param.name] = value
-            elif param.in_ == "header":
+            elif param.in_ == PARAM_IN_HEADER:
                 headers[param.name] = str(value)
 
         # 5. Format path

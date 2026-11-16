@@ -7,6 +7,16 @@ from pathlib import Path
 import msgspec
 import zstandard as zstd
 
+from ..constants import (
+    DEFAULT_DATA_DIR_NAME,
+    ENV_MAPI_DATA_DIR,
+    ENV_MAPI_REGISTRY_PATH,
+    MAPI_EXT_JSON,
+    MAPI_EXT_MSGPACK,
+    MAPI_EXT_MSGPACK_ZST,
+    MAPI_EXT_ZST,
+    PRIMARY_REGISTRY_FILENAME,
+)
 from ..exceptions import ConfigurationError, ServiceNotFoundError
 from ..models.domain import Operation, ServiceData
 from ..models.registry import ServiceRegistry
@@ -15,24 +25,19 @@ from .packfile import PackfileLoader
 log = logging.getLogger(__name__)
 
 _PACKAGE_DIR = Path(__file__).resolve().parent.parent
-_DEFAULT_DATA_DIR = _PACKAGE_DIR / "data"
-_PRIMARY_REGISTRY = _PACKAGE_DIR / "mapi-registry.json"
-_LEGACY_REGISTRY = _PACKAGE_DIR / "services.json"
+_DEFAULT_DATA_DIR = _PACKAGE_DIR / DEFAULT_DATA_DIR_NAME
+_PRIMARY_REGISTRY = _PACKAGE_DIR / PRIMARY_REGISTRY_FILENAME
 
 
 def _default_data_dir() -> Path:
-    env = os.environ.get("MAPI_DATA_DIR")
+    env = os.environ.get(ENV_MAPI_DATA_DIR)
     return Path(env) if env else _DEFAULT_DATA_DIR
 
 
 def _default_registry_path() -> Path:
-    env = os.environ.get("MAPI_REGISTRY_PATH")
+    env = os.environ.get(ENV_MAPI_REGISTRY_PATH)
     if env:
         return Path(env)
-    if _PRIMARY_REGISTRY.exists():
-        return _PRIMARY_REGISTRY
-    if _LEGACY_REGISTRY.exists():
-        return _LEGACY_REGISTRY
     return _PRIMARY_REGISTRY
 
 
@@ -41,7 +46,7 @@ class DiskLoader:
     Single abstraction over all filesystem access for mapi service data.
 
     Directory layout:
-      data_dir / provider / source / api / {api}.utilize.json[.zst]
+      data_dir / provider / source / api / {api}.mapi.json[.zst]
     """
 
     def __init__(
@@ -66,7 +71,7 @@ class DiskLoader:
         self._path_cache: dict[tuple[str, str, str], tuple[Path, bool, bool]] = {}
 
     def load_registry(self) -> ServiceRegistry:
-        """Load and decode mapi-registry.json (or fallback services.json) into a typed ServiceRegistry."""
+        """Load and decode mapi-registry.json into a typed ServiceRegistry."""
         if self._packfile is not None:
             return self._packfile.load_registry()
 
@@ -79,7 +84,7 @@ class DiskLoader:
         return self._registry_decoder.decode(self.registry_path.read_bytes())
 
     def load_service(self, provider: str, api: str, source: str) -> ServiceData:
-        """Load utilize.json, utilize.msgpack, or .zst for a service."""
+        """Load mapi.json, mapi.msgpack, or .zst for a service."""
         if self._packfile is not None:
             return self._packfile.load_service(provider, api, source)
 
@@ -94,10 +99,10 @@ class DiskLoader:
 
         service_dir = self.service_dir(provider, api, source)
         candidates = (
-            (service_dir / f"{api}.utilize.msgpack.zst", True, True),
-            (service_dir / f"{api}.utilize.msgpack", False, True),
-            (service_dir / f"{api}.utilize.json.zst", True, False),
-            (service_dir / f"{api}.utilize.json", False, False),
+            (service_dir / f"{api}{MAPI_EXT_MSGPACK_ZST}", True, True),
+            (service_dir / f"{api}{MAPI_EXT_MSGPACK}", False, True),
+            (service_dir / f"{api}{MAPI_EXT_ZST}", True, False),
+            (service_dir / f"{api}{MAPI_EXT_JSON}", False, False),
         )
         for path, is_compressed, is_msgpack in candidates:
             if path.exists():

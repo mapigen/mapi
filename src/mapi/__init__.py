@@ -2,6 +2,7 @@
 
 from .auth import ApiKeyAuth, BearerAuth
 from .client import Mapi
+from .constants import DEFAULT_VERSION
 from .exceptions import (
     ClientError,
     ConfigurationError,
@@ -18,7 +19,7 @@ from .models.request import BatchRequest, RequestConfig
 from .models.response import HeadersDict, MapiResult, ResponseMetadata
 from .models.spec import SpecDiffResult
 
-__version__ = "0.1.0"
+__version__ = DEFAULT_VERSION
 
 __all__ = [
     "ApiKeyAuth",

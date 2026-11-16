@@ -5,9 +5,17 @@ import os
 
 import msgspec
 
+from ..constants import (
+    DEFAULT_HEADERS,
+    ENV_MAPI_CACHE_MAXSIZE,
+    ENV_MAPI_PINNED_SERVICES,
+    ENV_MAPI_SERVER_PATTERN,
+    ENV_MAPI_SERVER_TAG,
+)
+
 
 def _default_headers() -> dict[str, str]:
-    return {"User-Agent": "mapi/0.1.0", "Accept": "application/json"}
+    return dict(DEFAULT_HEADERS)
 
 
 class ClientConfig(msgspec.Struct, frozen=True, gc=False):
@@ -29,12 +37,12 @@ class ClientConfig(msgspec.Struct, frozen=True, gc=False):
     @classmethod
     def from_env(cls) -> ClientConfig:
         """Create config from environment variables (MAPI_* prefix)."""
-        server_tag = os.environ.get("MAPI_SERVER_TAG") or os.environ.get("MAPI_SERVER_PATTERN")
+        server_tag = os.environ.get(ENV_MAPI_SERVER_TAG) or os.environ.get(ENV_MAPI_SERVER_PATTERN)
         return cls(
-            cache_maxsize=int(os.environ.get("MAPI_CACHE_MAXSIZE", 64)),
+            cache_maxsize=int(os.environ.get(ENV_MAPI_CACHE_MAXSIZE, 64)),
             pinned_services=tuple(
                 s.strip()
-                for s in os.environ.get("MAPI_PINNED_SERVICES", "").split(",")
+                for s in os.environ.get(ENV_MAPI_PINNED_SERVICES, "").split(",")
                 if s.strip()
             ),
             server_tag=server_tag,

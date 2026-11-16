@@ -96,12 +96,12 @@ def write_metadata(result: dict[str, Any], overrides: dict[str, Any], data_dir: 
     metadata_yml_path.write_bytes(msgspec.yaml.encode(metadata_content))
 
 
-def handle_utilize_compression(utilize_path: Path, no_compress: bool = False) -> None:
-    if not no_compress and utilize_path.exists():
-        compressed_data = compress_zstd(utilize_path.read_bytes())
-        compressed_path = utilize_path.with_suffix(".json.zst")
+def handle_mapi_compression(mapi_path: Path, no_compress: bool = False) -> None:
+    if not no_compress and mapi_path.exists():
+        compressed_data = compress_zstd(mapi_path.read_bytes())
+        compressed_path = mapi_path.with_suffix(".json.zst")
         compressed_path.write_bytes(compressed_data)
-        utilize_path.unlink()
+        mapi_path.unlink()
 
 
 def main():
@@ -116,7 +116,7 @@ def main():
         "--force-reprocess", action="store_true", help="Reprocess all cached specs."
     )
     parser.add_argument(
-        "--no-compress-utilize", action="store_true", help="Do not compress utilize.json."
+        "--no-compress-mapi", dest="no_compress_mapi", action="store_true", help="Do not compress mapi.json."
     )
     parser.add_argument(
         "--data-dir", type=Path, default=DATA_DIR, help="Destination data directory."
@@ -152,24 +152,25 @@ def main():
         data_dir=args.data_dir,
         process_workers=args.process_workers,
         batch_size=args.batch_size,
-        no_compress_utilize=args.no_compress_utilize,
+        no_compress_mapi=args.no_compress_mapi,
     )
 
     # 3. Metadata and Registry Generation
     for result in processing_results:
         if result.get("status") == "success":
             write_metadata(result, overrides, args.data_dir)
-            if "utilize_path" in result:
-                handle_utilize_compression(result["utilize_path"], args.no_compress_utilize)
+            target_path = result.get("mapi_path")
+            if target_path:
+                handle_mapi_compression(target_path, args.no_compress_mapi)
 
     builder = RegistryBuilder(data_dir=args.data_dir, registry_path=SERVICES_JSON_PATH)
     registry = builder.build_registry()
     builder.save_registry(registry)
 
-    # Mirror to top-level services.json
-    top_level_services = ROOT_DIR / "services.json"
+    # Mirror to top-level mapi-registry.json
+    top_level_registry = ROOT_DIR / "mapi-registry.json"
     if SERVICES_JSON_PATH.exists():
-        top_level_services.write_bytes(SERVICES_JSON_PATH.read_bytes())
+        top_level_registry.write_bytes(SERVICES_JSON_PATH.read_bytes())
 
     total_duration = time.perf_counter() - overall_start
     generate_performance_report(download_results, processing_results, total_duration)

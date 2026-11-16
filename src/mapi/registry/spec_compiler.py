@@ -5,6 +5,17 @@ import re
 import urllib.parse
 from typing import Any
 
+from ..constants import (
+    EXT_JSON,
+    EXT_YAML,
+    EXT_YML,
+    MAPI_EXT_JSON,
+    MIME_APPLICATION_JSON,
+    OPENAPI_EXT_JSON,
+    OPENAPI_EXT_YAML,
+    PARAM_IN_BODY,
+    VALID_HTTP_METHODS,
+)
 from ..models.domain import (
     Components,
     HttpMethod,
@@ -15,7 +26,14 @@ from ..models.domain import (
     ServiceData,
 )
 
-_VALID_METHODS = {"get", "post", "put", "delete", "patch", "head", "options", "trace"}
+_KNOWN_SPEC_EXTENSIONS = (
+    OPENAPI_EXT_JSON,
+    MAPI_EXT_JSON,
+    OPENAPI_EXT_YAML,
+    EXT_JSON,
+    EXT_YAML,
+    EXT_YML,
+)
 
 
 def infer_provider(spec: dict[str, Any], url_or_path: str | None = None) -> str:
@@ -58,14 +76,7 @@ def infer_provider(spec: dict[str, Any], url_or_path: str | None = None) -> str:
         parsed = urllib.parse.urlparse(url_or_path)
         path = parsed.path or url_or_path
         stem = path.split("/")[-1].split("?")[0].split("#")[0]
-        for ext in (
-            ".openapi.json",
-            ".utilize.json",
-            ".openapi.yaml",
-            ".json",
-            ".yaml",
-            ".yml",
-        ):
+        for ext in _KNOWN_SPEC_EXTENSIONS:
             if stem.endswith(ext):
                 stem = stem[: -len(ext)]
                 break
@@ -128,7 +139,7 @@ def compile_spec(spec: dict[str, Any], service_name: str) -> ServiceData:
 
             for method_str, op_dict in path_item.items():
                 method_lower = method_str.lower()
-                if method_lower not in _VALID_METHODS or not isinstance(op_dict, dict):
+                if method_lower not in VALID_HTTP_METHODS or not isinstance(op_dict, dict):
                     continue
 
                 op_id = op_dict.get("operationId")
@@ -170,7 +181,7 @@ def compile_spec(spec: dict[str, Any], service_name: str) -> ServiceData:
                 request_body = op_dict.get("requestBody")
                 if isinstance(request_body, dict):
                     content = request_body.get("content", {})
-                    json_content = content.get("application/json", {})
+                    json_content = content.get(MIME_APPLICATION_JSON, {})
                     body_schema = json_content.get("schema", {})
                     # If properties exist in body schema, expose them as body parameters
                     if isinstance(body_schema, dict) and "properties" in body_schema:
@@ -181,7 +192,7 @@ def compile_spec(spec: dict[str, Any], service_name: str) -> ServiceData:
                                 combined_params.append(
                                     Parameter(
                                         name=prop_name,
-                                        in_="body",
+                                        in_=PARAM_IN_BODY,
                                         schema_=prop_def if isinstance(prop_def, dict) else {},
                                         description=str(prop_def.get("description", ""))
                                         if isinstance(prop_def, dict)

@@ -6,6 +6,18 @@ from typing import Any, Literal
 
 import msgspec
 
+from ..constants import (
+    HEADER_CONTENT_TYPE_LOWER,
+    HEADER_ETAG_LOWER,
+    HEADER_RATELIMIT_LIMIT,
+    HEADER_RATELIMIT_REMAINING,
+    HEADER_RATELIMIT_RESET,
+    HEADER_RETRY_AFTER_LOWER,
+    HEADER_X_RATELIMIT_LIMIT,
+    HEADER_X_RATELIMIT_REMAINING,
+    HEADER_X_RATELIMIT_RESET,
+)
+
 
 class HeadersDict(dict[str, str]):
     """Case-insensitive dictionary for HTTP response headers preserving original casing."""
@@ -56,17 +68,17 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     @property
     def content_type(self) -> str | None:
         """Content-Type header value."""
-        return self._get_header("content-type")
+        return self._get_header(HEADER_CONTENT_TYPE_LOWER)
 
     @property
     def etag(self) -> str | None:
         """ETag header value."""
-        return self._get_header("etag")
+        return self._get_header(HEADER_ETAG_LOWER)
 
     @property
     def retry_after(self) -> float | None:
         """Retry-After header value in seconds, if present and parseable."""
-        val = self._get_header("retry-after")
+        val = self._get_header(HEADER_RETRY_AFTER_LOWER)
         if val is None:
             return None
         with contextlib.suppress(ValueError):
@@ -76,7 +88,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     @property
     def rate_limit_limit(self) -> int | None:
         """Rate limit maximum request quota."""
-        val = self._get_header("x-ratelimit-limit") or self._get_header("ratelimit-limit")
+        val = self._get_header(HEADER_X_RATELIMIT_LIMIT) or self._get_header(HEADER_RATELIMIT_LIMIT)
         if val is not None:
             with contextlib.suppress(ValueError):
                 return int(val)
@@ -85,7 +97,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     @property
     def rate_limit_remaining(self) -> int | None:
         """Rate limit remaining request quota."""
-        val = self._get_header("x-ratelimit-remaining") or self._get_header("ratelimit-remaining")
+        val = self._get_header(HEADER_X_RATELIMIT_REMAINING) or self._get_header(HEADER_RATELIMIT_REMAINING)
         if val is not None:
             with contextlib.suppress(ValueError):
                 return int(val)
@@ -94,7 +106,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     @property
     def rate_limit_reset(self) -> int | None:
         """Rate limit reset epoch or delta."""
-        val = self._get_header("x-ratelimit-reset") or self._get_header("ratelimit-reset")
+        val = self._get_header(HEADER_X_RATELIMIT_RESET) or self._get_header(HEADER_RATELIMIT_RESET)
         if val is not None:
             with contextlib.suppress(ValueError):
                 return int(val)

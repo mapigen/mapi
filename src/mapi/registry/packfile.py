@@ -9,6 +9,7 @@ from typing import Any
 import msgspec
 import zstandard as zstd
 
+from ..constants import PACKFILE_ZSTD_MAGIC
 from ..exceptions import ConfigurationError, ServiceNotFoundError
 from ..models.domain import Operation, ServiceData
 from ..models.registry import ServiceRegistry
@@ -52,7 +53,7 @@ class PackfileLoader:
             raise ConfigurationError(f"Packfile at {self.db_path} is missing 'meta:registry'")
         payload: bytes = row[0]
         # Check if compressed
-        if payload.startswith(b"\x28\xb5\x2f\xfd"):
+        if payload.startswith(PACKFILE_ZSTD_MAGIC):
             payload = self._dctx.decompress(payload)
         return self._registry_decoder.decode(payload)
 
@@ -68,7 +69,7 @@ class PackfileLoader:
                 service=f"{provider}/{api}/{source}",
             )
         payload: bytes = row[0]
-        if payload.startswith(b"\x28\xb5\x2f\xfd"):
+        if payload.startswith(PACKFILE_ZSTD_MAGIC):
             payload = self._dctx.decompress(payload)
         return self._service_decoder.decode(payload)
 
@@ -83,7 +84,7 @@ class PackfileLoader:
         if not row:
             return None
         payload: bytes = row[0]
-        if payload.startswith(b"\x28\xb5\x2f\xfd"):
+        if payload.startswith(PACKFILE_ZSTD_MAGIC):
             payload = self._dctx.decompress(payload)
         return self._op_decoder.decode(payload)
 
@@ -96,7 +97,7 @@ class PackfileLoader:
         if not row:
             return []
         payload: bytes = row[0]
-        if payload.startswith(b"\x28\xb5\x2f\xfd"):
+        if payload.startswith(PACKFILE_ZSTD_MAGIC):
             payload = self._dctx.decompress(payload)
         return msgspec.msgpack.decode(payload, type=list[str])
 
