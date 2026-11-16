@@ -11,6 +11,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True):
     duration_ms: int
     status: Literal["success", "error"]
     http_status: Optional[int] = None
+    network_duration_ms: Optional[int] = None
     timestamp: str = ""
     error_type: Optional[str] = None
     error_category: Optional[str] = None

@@ -115,9 +115,19 @@ class TestResponseMetadata:
     def test_valid_status_literals(self):
         m = ResponseMetadata(service="svc", operation="op", duration_ms=42, status="success")
         assert m.status == "success"
+        assert m.network_duration_ms is None
+
+    def test_network_duration_field(self):
+        m = ResponseMetadata(service="svc", operation="op", duration_ms=50,
+                             network_duration_ms=42, status="success")
+        assert m.duration_ms == 50
+        assert m.network_duration_ms == 42
+        decoded = msgspec.json.decode(msgspec.json.encode(m), type=ResponseMetadata)
+        assert decoded.network_duration_ms == 42
 
     def test_encode_decode(self):
-        m = ResponseMetadata(service="svc", operation="op", duration_ms=42, status="error",
+        m = ResponseMetadata(service="svc", operation="op", duration_ms=42,
+                             network_duration_ms=30, status="error",
                              http_status=500, error_type="server_error")
         decoded = msgspec.json.decode(msgspec.json.encode(m), type=ResponseMetadata)
         assert decoded == m

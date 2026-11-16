@@ -51,6 +51,7 @@ def test_proxy_end_to_end_success(mock_sdk_environment):
     assert result.metadata.service == "pokeapi/REST/openapi"
     assert result.metadata.operation == "get_user"
     assert result.metadata.http_status == 200
+    assert result.metadata.network_duration_ms is not None
 
 
 def test_proxy_non_existent_provider_raises_attribute_error(mock_sdk_environment):

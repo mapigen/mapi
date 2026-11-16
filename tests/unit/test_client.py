@@ -108,6 +108,8 @@ class TestMapiExecution:
         assert result.data == {"id": 1, "name": "pikachu"}
         assert result.metadata.status == "success"
         assert result.metadata.http_status == 200
+        assert result.metadata.network_duration_ms is not None
+        assert result.metadata.duration_ms >= 0
 
     def test_proxy_call_syntax(self, sample_service_data, sample_registry):
         client = _build_test_mapi(sample_service_data, sample_registry)
@@ -121,6 +123,7 @@ class TestMapiExecution:
         result = await client.aexecute("pokeapi", "REST", "openapi", "get_pokemon", id="pikachu")
         assert isinstance(result, MapiResult)
         assert result.data == {"id": 1, "name": "pikachu"}
+        assert result.metadata.network_duration_ms is not None
 
     @pytest.mark.asyncio
     async def test_proxy_async_aexecute_syntax(self, sample_service_data, sample_registry):

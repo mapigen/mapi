@@ -127,14 +127,18 @@ class Mapi:
             **kwargs,
         )
         try:
+            net_start = time.monotonic()
             response = self._transport.request(config, auth=self._auth)
+            network_duration_ms = int((time.monotonic() - net_start) * 1000)
+            data = response.json()
             duration_ms = int((time.monotonic() - start) * 1000)
             return MapiResult(
-                data=response.json(),
+                data=data,
                 metadata=ResponseMetadata(
                     service=service_name,
                     operation=operation,
                     duration_ms=duration_ms,
+                    network_duration_ms=network_duration_ms,
                     status="success",
                     http_status=response.status_code,
                     timestamp=_utc_now_iso(),
@@ -200,14 +204,18 @@ class Mapi:
             **kwargs,
         )
         try:
+            net_start = time.monotonic()
             response = await self._transport.arequest(config, auth=self._auth)
+            network_duration_ms = int((time.monotonic() - net_start) * 1000)
+            data = response.json()
             duration_ms = int((time.monotonic() - start) * 1000)
             return MapiResult(
-                data=response.json(),
+                data=data,
                 metadata=ResponseMetadata(
                     service=service_name,
                     operation=operation,
                     duration_ms=duration_ms,
+                    network_duration_ms=network_duration_ms,
                     status="success",
                     http_status=response.status_code,
                     timestamp=_utc_now_iso(),
