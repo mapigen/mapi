@@ -61,6 +61,7 @@ class Mapi:
         registry_path: Path | None = None,
         packfile_path: Path | None = None,
         base_url: str | None = None,
+        online: bool = False,
         **transport_kwargs: Any,
     ) -> None:
         cfg = config or ClientConfig()
@@ -87,7 +88,10 @@ class Mapi:
 
         # 1. Registry & Caching infrastructure
         self._loader = DiskLoader(
-            data_dir=data_dir, registry_path=registry_path, packfile_path=packfile_path
+            data_dir=data_dir,
+            registry_path=registry_path,
+            packfile_path=packfile_path,
+            online=online,
         )
         self._registry_mgr = RegistryManager(self._loader)
         self._cache = ServiceCache(

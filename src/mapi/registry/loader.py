@@ -51,10 +51,12 @@ class DiskLoader:
         data_dir: Path | None = None,
         registry_path: Path | None = None,
         packfile_path: Path | None = None,
+        online: bool = False,
     ) -> None:
         self.data_dir = data_dir or _default_data_dir()
         self.registry_path = registry_path or _default_registry_path()
         self.packfile_path = packfile_path
+        self.online = online or os.environ.get("MAPI_ONLINE") == "1"
         self._packfile: PackfileLoader | None = None
         if self.packfile_path is not None and self.packfile_path.exists():
             self._packfile = PackfileLoader(self.packfile_path)
@@ -117,10 +119,11 @@ class DiskLoader:
                     return self._service_msgpack_decoder.decode(content)
                 return self._service_decoder.decode(content)
 
-        # Pull-through online spec fetching if declared in registry
-        online_data = self._fetch_and_compile_service(provider, api, source)
-        if online_data is not None:
-            return online_data
+        # Pull-through online spec fetching if declared in registry and online mode is enabled
+        if self.online and os.environ.get("MAPI_OFFLINE") != "1":
+            online_data = self._fetch_and_compile_service(provider, api, source)
+            if online_data is not None:
+                return online_data
 
         raise ServiceNotFoundError(
             f"Service data for '{provider}/{api}/{source}' not found. Expected at {service_dir}",
