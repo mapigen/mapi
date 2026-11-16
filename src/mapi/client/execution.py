@@ -31,7 +31,7 @@ T = TypeVar("T")
 
 def _utc_now_iso() -> str:
     """Return ISO 8601 UTC timestamp."""
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).isoformat()
 
 
 def _to_ms(seconds: float) -> int:
@@ -255,9 +255,11 @@ class RequestExecutor:
             kwargs, _type, _raw, _dry_run, _idempotent, _stream
         )
 
-        (service_name, config), prep_time = _measure(
-            self.prepare_request, provider, api, source, operation, kwargs, idempotent=idempotent
+        t_start = time.perf_counter()
+        service_name, config = self.prepare_request(
+            provider, api, source, operation, kwargs, idempotent=idempotent
         )
+        prep_time = time.perf_counter() - t_start
 
         if dry_run:
             return MapiResult(
@@ -276,9 +278,10 @@ class RequestExecutor:
 
         try:
             auth = getattr(self._client, "_auth", None)
-            response, net_time = _measure(
-                self._client._transport.request, config, auth=auth, stream=stream
-            )
+            t_net = time.perf_counter()
+            response = self._client._transport.request(config, auth=auth, stream=stream)
+            net_time = time.perf_counter() - t_net
+
             raw_headers = getattr(response, "headers", None)
             resp_headers = (
                 HeadersDict(raw_headers) if isinstance(raw_headers, Mapping) else HeadersDict()
@@ -287,7 +290,9 @@ class RequestExecutor:
                 data = getattr(response, "iter_content", lambda: response)()
                 post_time = 0.0
             else:
-                data, post_time = _measure(self.decode_response, response, target_type, raw)
+                t_post = time.perf_counter()
+                data = self.decode_response(response, target_type, raw)
+                post_time = time.perf_counter() - t_post
 
             return _build_result(
                 service_name,

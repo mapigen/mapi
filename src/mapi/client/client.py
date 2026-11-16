@@ -122,7 +122,12 @@ class Mapi:
     def __getattr__(self, name: str) -> ProviderProxy:
         """Dynamically resolve provider names without intercepting real attributes."""
         try:
-            if hasattr(self, "_discovery") and self._discovery.provider_exists(name):
+            discovery = self._discovery
+        except AttributeError:
+            raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'") from None
+
+        try:
+            if discovery.provider_exists(name):
                 return ProviderProxy(self, name)
         except Exception:
             pass
@@ -143,13 +148,16 @@ class Mapi:
         idempotent: bool = False,
     ) -> tuple[str, RequestConfig]:
         """Validate parameters and build RequestConfig (delegates to executor)."""
-        executor = getattr(self, "_executor", None)
-        if executor is None:
+        try:
+            return self._executor.prepare_request(
+                provider, api, source, operation, kwargs, idempotent=idempotent
+            )
+        except AttributeError:
             executor = RequestExecutor(self)
             self._executor = executor
-        return executor.prepare_request(
-            provider, api, source, operation, kwargs, idempotent=idempotent
-        )
+            return executor.prepare_request(
+                provider, api, source, operation, kwargs, idempotent=idempotent
+            )
 
     def _decode_response(
         self,
@@ -158,11 +166,12 @@ class Mapi:
         raw: bool = False,
     ) -> Any:
         """Decode response body (delegates to executor)."""
-        executor = getattr(self, "_executor", None)
-        if executor is None:
+        try:
+            return self._executor.decode_response(response, target_type=target_type, raw=raw)
+        except AttributeError:
             executor = RequestExecutor(self)
             self._executor = executor
-        return executor.decode_response(response, target_type=target_type, raw=raw)
+            return executor.decode_response(response, target_type=target_type, raw=raw)
 
     def execute(
         self,
@@ -179,22 +188,34 @@ class Mapi:
         **kwargs: Any,
     ) -> MapiResult:
         """Execute an API operation synchronously."""
-        executor = getattr(self, "_executor", None)
-        if executor is None:
+        try:
+            return self._executor.execute(
+                provider,
+                api,
+                source,
+                operation,
+                _type=_type,
+                _raw=_raw,
+                _dry_run=_dry_run,
+                _idempotent=_idempotent,
+                _stream=_stream,
+                **kwargs,
+            )
+        except AttributeError:
             executor = RequestExecutor(self)
             self._executor = executor
-        return executor.execute(
-            provider,
-            api,
-            source,
-            operation,
-            _type=_type,
-            _raw=_raw,
-            _dry_run=_dry_run,
-            _idempotent=_idempotent,
-            _stream=_stream,
-            **kwargs,
-        )
+            return executor.execute(
+                provider,
+                api,
+                source,
+                operation,
+                _type=_type,
+                _raw=_raw,
+                _dry_run=_dry_run,
+                _idempotent=_idempotent,
+                _stream=_stream,
+                **kwargs,
+            )
 
     async def aexecute(
         self,
