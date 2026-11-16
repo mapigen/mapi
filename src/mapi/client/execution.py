@@ -159,12 +159,19 @@ class RequestExecutor:
         self,
         provider: str,
         api: str,
-        source: str,
+        source: str | None,
         operation: str,
         kwargs: dict[str, Any],
         idempotent: bool = False,
     ) -> tuple[str, RequestConfig]:
         """Validate parameters and construct RequestConfig."""
+        if source is None:
+            try:
+                info = self._client._discovery.get_api_info(provider, api)
+                source = info.sources[0] if info.sources else "openapi"
+            except Exception:
+                source = "openapi"
+
         service_name = f"{provider}/{api}/{source}"
         cfg = getattr(self._client, "_config", None)
         base_url = cfg.base_url if cfg else None
@@ -233,7 +240,7 @@ class RequestExecutor:
         self,
         provider: str,
         api: str,
-        source: str,
+        source: str | None,
         operation: str,
         *,
         _type: Any = None,
@@ -300,7 +307,7 @@ class RequestExecutor:
         self,
         provider: str,
         api: str,
-        source: str,
+        source: str | None,
         operation: str,
         *,
         _type: Any = None,
