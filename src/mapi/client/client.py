@@ -115,7 +115,7 @@ class Mapi:
         self, provider: str, api: str, source: str, operation: str, **kwargs: Any
     ) -> MapiResult:
         """Execute an API operation synchronously."""
-        start = time.monotonic()
+        start = time.perf_counter()
         service_name = f"{provider}/{api}/{source}"
         config = self._builder.build(
             provider,
@@ -126,18 +126,24 @@ class Mapi:
             timeout=self._config.default_timeout,
             **kwargs,
         )
+        prep_time = time.perf_counter() - start
         try:
-            net_start = time.monotonic()
+            net_start = time.perf_counter()
             response = self._transport.request(config, auth=self._auth)
-            network_duration_ms = int((time.monotonic() - net_start) * 1000)
+            net_time = time.perf_counter() - net_start
+
+            post_start = time.perf_counter()
             data = response.json()
-            duration_ms = int((time.monotonic() - start) * 1000)
+            post_time = time.perf_counter() - post_start
+
+            ops_duration_ms = max(0, int(round((prep_time + post_time) * 1000)))
+            network_duration_ms = max(0, int(round(net_time * 1000)))
             return MapiResult(
                 data=data,
                 metadata=ResponseMetadata(
                     service=service_name,
                     operation=operation,
-                    duration_ms=duration_ms,
+                    duration_ms=ops_duration_ms,
                     network_duration_ms=network_duration_ms,
                     status="success",
                     http_status=response.status_code,
@@ -148,7 +154,7 @@ class Mapi:
             raise
         except HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else None
-            duration_ms = int((time.monotonic() - start) * 1000)
+            duration_ms = int((time.perf_counter() - start) * 1000)
             if status == 429:
                 raise RateLimitError(
                     str(exc),
@@ -192,7 +198,7 @@ class Mapi:
         self, provider: str, api: str, source: str, operation: str, **kwargs: Any
     ) -> MapiResult:
         """Execute an API operation asynchronously."""
-        start = time.monotonic()
+        start = time.perf_counter()
         service_name = f"{provider}/{api}/{source}"
         config = self._builder.build(
             provider,
@@ -203,18 +209,24 @@ class Mapi:
             timeout=self._config.default_timeout,
             **kwargs,
         )
+        prep_time = time.perf_counter() - start
         try:
-            net_start = time.monotonic()
+            net_start = time.perf_counter()
             response = await self._transport.arequest(config, auth=self._auth)
-            network_duration_ms = int((time.monotonic() - net_start) * 1000)
+            net_time = time.perf_counter() - net_start
+
+            post_start = time.perf_counter()
             data = response.json()
-            duration_ms = int((time.monotonic() - start) * 1000)
+            post_time = time.perf_counter() - post_start
+
+            ops_duration_ms = max(0, int(round((prep_time + post_time) * 1000)))
+            network_duration_ms = max(0, int(round(net_time * 1000)))
             return MapiResult(
                 data=data,
                 metadata=ResponseMetadata(
                     service=service_name,
                     operation=operation,
-                    duration_ms=duration_ms,
+                    duration_ms=ops_duration_ms,
                     network_duration_ms=network_duration_ms,
                     status="success",
                     http_status=response.status_code,
