@@ -1,9 +1,8 @@
-.PHONY: help lint test test-cov populate validate clean show-format show-data
+.PHONY: help lint test test-cov benchmark clean
 
 VENV_BIN := $(shell if [ -d ".venv/bin" ]; then echo ".venv/bin/"; fi)
-PYTHON := PYTHONPATH=src:tools:. $(VENV_BIN)python3
+PYTHON := PYTHONPATH=src:. $(VENV_BIN)python3
 PYTEST := $(VENV_BIN)pytest
-TOOLS := $(PYTHON) -m tools
 
 help: ## Show this help message
 	@echo "Available targets:"
@@ -19,20 +18,8 @@ test: ## Run test suite
 test-cov: ## Run test suite with coverage
 	$(PYTEST) --cov=mapi --cov-report=term-missing tests/
 
-show-format: ## Display the standard SDK response format
-	@$(PYTHON) utils/show_format.py
-
-show-data: ## Pretty-print a response file. Usage: make show-data tmp/file.json
-	@$(PYTHON) utils/show_format.py $(filter-out $@,$(MAKECMDGOALS))
-
-populate: ## Populate API data from registry sources
-	$(TOOLS).populate $(ARGS)
-
-populate-force: ## Force reprocess all API data
-	$(TOOLS).populate --force-reprocess $(ARGS)
-
-validate: ## Validate generated data integrity
-	$(TOOLS).validate
+benchmark: ## Run execution benchmarks and call budget verification
+	$(PYTHON) -m tests.benchmark_profile
 
 clean: ## Clean build artifacts and caches
 	find . -type d -name "__pycache__" -exec rm -rf {} +

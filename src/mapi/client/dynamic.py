@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 import msgspec
 
 from ..exceptions import ServiceNotFoundError, SpecUpdateAvailableWarning
+from ..models.domain import SpecDiffResult
 from ..models.registry import ApiInfo, ServiceRegistry
-from ..models.spec import SpecDiffResult
 from ..registry.spec_compiler import compile_spec, infer_provider
 
 if TYPE_CHECKING:

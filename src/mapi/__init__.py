@@ -15,9 +15,9 @@ from .exceptions import (
     ValidationError,
 )
 from .models.config import ClientConfig
+from .models.domain import SpecDiffResult
 from .models.request import BatchRequest, RequestConfig
 from .models.response import HeadersDict, MapiResult, ResponseMetadata
-from .models.spec import SpecDiffResult
 
 __version__ = DEFAULT_VERSION
 

@@ -32,7 +32,7 @@ pythonpath = ["src", "."]
 addopts = "-v"
 
 [tool.pyright]
-include = ["src", "tests", "tools"]
+include = ["src", "tests"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.11"

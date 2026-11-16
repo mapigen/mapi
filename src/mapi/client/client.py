@@ -13,9 +13,9 @@ from ..auth import ApiKeyAuth, BearerAuth
 from ..cache.hot_cache import HotOpCache
 from ..cache.service_cache import ServiceCache
 from ..models.config import ClientConfig
+from ..models.domain import SpecDiffResult
 from ..models.request import BatchRequest, RequestConfig
 from ..models.response import MapiResult
-from ..models.spec import SpecDiffResult
 from ..proxy.provider import ProviderProxy
 from ..registry.discovery import DiscoveryService, RegistryManager
 from ..registry.loader import DiskLoader

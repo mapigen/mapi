@@ -9,11 +9,11 @@ from .domain import (
     ParameterUnion,
     Server,
     ServiceData,
+    SpecDiffResult,
 )
 from .registry import ApiInfo, MetadataFile, ServiceRegistry
 from .request import BatchRequest, RequestConfig
 from .response import HeadersDict, MapiResult, ResponseMetadata
-from .spec import SpecDiffResult
 
 __all__ = [
     "Parameter",
