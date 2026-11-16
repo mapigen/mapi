@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, NoReturn, Optional, TypeVar, Union
 
+import msgspec
 from niquests.auth import AuthBase
 from niquests.exceptions import ConnectionError, HTTPError, Timeout
 
@@ -162,6 +163,7 @@ class Mapi:
         self._builder = RequestBuilder(self._cache, validator)
         self._transport = transport or NiquestsTransport(**transport_kwargs)
         self._config = cfg
+        self._json_decoder = msgspec.json.Decoder()
 
         log.setLevel(getattr(logging, cfg.log_level.upper(), logging.INFO))
 
@@ -195,6 +197,21 @@ class Mapi:
         )
         return service_name, config
 
+    def _decode_response(self, response: Any) -> Any:
+        """Decode response body directly with msgspec C decoder, falling back to response.json()."""
+        content = getattr(response, "content", None)
+        if isinstance(content, (bytes, bytearray, memoryview)) and content:
+            try:
+                return self._json_decoder.decode(content)
+            except Exception:
+                pass
+        if hasattr(response, "json") and callable(response.json):
+            try:
+                return response.json()
+            except Exception:
+                return None
+        return None
+
     def execute(
         self, provider: str, api: str, source: str, operation: str, **kwargs: Any
     ) -> MapiResult:
@@ -204,7 +221,7 @@ class Mapi:
         )
         try:
             response, net_time = _measure(self._transport.request, config, auth=self._auth)
-            data, post_time = _measure(response.json)
+            data, post_time = _measure(self._decode_response, response)
             return _build_result(
                 service_name, operation, response.status_code, data, prep_time + post_time, net_time
             )
@@ -224,7 +241,7 @@ class Mapi:
             response, net_time = await _ameasure(
                 self._transport.arequest(config, auth=self._auth)
             )
-            data, post_time = _measure(response.json)
+            data, post_time = _measure(self._decode_response, response)
             return _build_result(
                 service_name, operation, response.status_code, data, prep_time + post_time, net_time
             )

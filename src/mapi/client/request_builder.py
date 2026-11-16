@@ -37,11 +37,7 @@ class RequestBuilder:
     ) -> RequestConfig:
         service_name = f"{provider}/{api}/{source}"
 
-        # 1. Parameter schema validation
-        if self._validator is not None:
-            self._validator.validate(provider, api, source, operation, kwargs)
-
-        # 2. Retrieve service definition
+        # 1. Retrieve service definition (cached in memory)
         service_data = self._cache.get(provider, api, source)
         op = service_data.operations.get(operation)
         if op is None:
@@ -49,6 +45,12 @@ class RequestBuilder:
                 f"Operation '{operation}' not found in '{service_name}'",
                 service=service_name,
                 operation=operation,
+            )
+
+        # 2. Parameter schema validation
+        if self._validator is not None:
+            self._validator.validate(
+                provider, api, source, operation, kwargs, service_data=service_data, op_details=op
             )
 
         # 3. Resolve base URL
@@ -94,7 +96,8 @@ class RequestBuilder:
                 operation=operation,
             ) from exc
 
-        full_url = f"{resolved_base_url.rstrip('/')}{formatted_path}"
+        clean_path = formatted_path if formatted_path.startswith("/") else f"/{formatted_path}"
+        full_url = f"{resolved_base_url.rstrip('/')}{clean_path}"
 
         return RequestConfig(
             method=op.method,

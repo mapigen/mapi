@@ -60,7 +60,8 @@ class ApiProxy:
             raise AttributeError(
                 f"No sources configured for API '{self._provider}/{self._api}'"
             )
-        return info.sources[0]
+        self._source = info.sources[0]
+        return self._source
 
     def __repr__(self) -> str:
         return f"ApiProxy(provider={self._provider!r}, api={self._api!r}, source={self._source!r})"

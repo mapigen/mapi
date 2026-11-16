@@ -34,11 +34,13 @@ class ParameterValidator:
     Validates call kwargs against an operation's declared OpenAPI parameter schema.
 
     Uses msgspec.defstruct to synthesize an operation-specific typed Struct,
-    then executes zero-copy schema validation with msgspec.convert.
+    caches compiled Struct types per operation, and executes zero-copy schema
+    validation with msgspec.convert.
     """
 
     def __init__(self, cache: ServiceCache) -> None:
         self._cache = cache
+        self._struct_cache: dict[tuple[str, str, str, str], Optional[type[msgspec.Struct]]] = {}
 
     def validate(
         self,
@@ -47,12 +49,31 @@ class ParameterValidator:
         source: str,
         operation: str,
         kwargs: dict[str, Any],
+        service_data: Optional[Any] = None,
+        op_details: Optional[Any] = None,
     ) -> None:
         """Raise ValidationError if kwargs fail parameter schema validation."""
         service_name = f"{provider}/{api}/{source}"
-        service_data = self._cache.get(provider, api, source)
+        cache_key = (provider, api, source, operation)
 
-        op_details = service_data.operations.get(operation)
+        # 1. Fast-path: Check compiled struct cache
+        if cache_key in self._struct_cache:
+            cached_struct = self._struct_cache[cache_key]
+            if cached_struct is None:
+                return
+            try:
+                msgspec.convert(kwargs, cached_struct, strict=False)
+                return
+            except msgspec.ValidationError as exc:
+                raise ValidationError(str(exc), service=service_name, operation=operation) from exc
+
+        # 2. First-time compile: Resolve service data and operation
+        if service_data is None:
+            service_data = self._cache.get(provider, api, source)
+
+        if op_details is None:
+            op_details = service_data.operations.get(operation)
+
         if not op_details:
             raise ServiceNotFoundError(
                 f"Operation '{operation}' not found in '{service_name}'",
@@ -79,11 +100,14 @@ class ParameterValidator:
                 struct_fields.append((param.name, Optional[py_type], None))
 
         if not struct_fields:
+            self._struct_cache[cache_key] = None
             return
 
-        ParamStruct = msgspec.defstruct(f"{operation}_params", struct_fields, gc=False)
+        param_struct = msgspec.defstruct(f"{operation}_params", struct_fields, gc=False)
+        self._struct_cache[cache_key] = param_struct
+
         try:
-            msgspec.convert(kwargs, ParamStruct, strict=False)
+            msgspec.convert(kwargs, param_struct, strict=False)
         except msgspec.ValidationError as exc:
             raise ValidationError(
                 str(exc),

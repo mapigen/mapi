@@ -25,10 +25,8 @@ class NiquestsTransport:
         self._sync_session = niquests.Session(**session_kwargs)
         self._async_session: Optional[niquests.AsyncSession] = None
 
-    # --- Sync ---
-
-    def request(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response:
-        log.debug("sync %s %s", config.method, config.url)
+    @staticmethod
+    def _prepare_kwargs(config: RequestConfig, auth: Optional[AuthBase] = None) -> dict[str, Any]:
         kw: dict[str, Any] = {"timeout": config.timeout}
         if config.params:
             kw["params"] = config.params
@@ -38,6 +36,13 @@ class NiquestsTransport:
             kw["json"] = config.json_body
         if auth is not None:
             kw["auth"] = auth
+        return kw
+
+    # --- Sync ---
+
+    def request(self, config: RequestConfig, auth: Optional[AuthBase] = None) -> Response:
+        log.debug("sync %s %s", config.method, config.url)
+        kw = self._prepare_kwargs(config, auth)
         response: Response = self._sync_session.request(config.method, config.url, **kw)
         response.raise_for_status()
         return response
@@ -51,15 +56,7 @@ class NiquestsTransport:
         log.debug("async %s %s", config.method, config.url)
         if self._async_session is None:
             self._async_session = niquests.AsyncSession(**self._kwargs)
-        kw: dict[str, Any] = {"timeout": config.timeout}
-        if config.params:
-            kw["params"] = config.params
-        if config.headers:
-            kw["headers"] = config.headers
-        if config.json_body is not None and config.method not in ("GET", "HEAD"):
-            kw["json"] = config.json_body
-        if auth is not None:
-            kw["auth"] = auth
+        kw = self._prepare_kwargs(config, auth)
         response: Response = await self._async_session.request(config.method, config.url, **kw)
         response.raise_for_status()
         return response

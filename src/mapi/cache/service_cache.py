@@ -28,27 +28,23 @@ class ServiceCache:
         loader_ref = loader
 
         @lru_cache(maxsize=maxsize)
-        def _lru_load(key: str) -> ServiceData:
-            provider, api, source = key.split(":", 2)
+        def _lru_load(provider: str, api: str, source: str) -> ServiceData:
             return loader_ref.load_service(provider, api, source)
 
         self._lru_load = _lru_load
 
-    @staticmethod
-    def _make_key(provider: str, api: str, source: str) -> str:
-        return f"{provider}:{api}:{source}"
-
     def get(self, provider: str, api: str, source: str) -> ServiceData:
         """Return ServiceData, retrieving from cache or loading from disk."""
-        key = self._make_key(provider, api, source)
-        if key in self._pinned_keys:
-            if key in self._pinned:
-                return self._pinned[key]
-            with self._lock:
-                if key not in self._pinned:
-                    self._pinned[key] = self._loader.load_service(provider, api, source)
-                return self._pinned[key]
-        return self._lru_load(key)
+        if self._pinned_keys:
+            key = f"{provider}:{api}:{source}"
+            if key in self._pinned_keys:
+                if key in self._pinned:
+                    return self._pinned[key]
+                with self._lock:
+                    if key not in self._pinned:
+                        self._pinned[key] = self._loader.load_service(provider, api, source)
+                    return self._pinned[key]
+        return self._lru_load(provider, api, source)
 
     def clear(self) -> None:
         """Evict all cached entries."""

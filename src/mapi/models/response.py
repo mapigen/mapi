@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional
 import msgspec
 
 
-class ResponseMetadata(msgspec.Struct, frozen=True):
+class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     """Telemetry for a completed API call."""
     service: str
     operation: str

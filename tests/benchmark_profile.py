@@ -50,6 +50,7 @@ def create_mock_client() -> Mapi:
     # Mock transport response
     mock_response = MagicMock()
     mock_response.status_code = 200
+    mock_response.content = b'{"id": 25, "name": "pikachu"}'
     mock_response.json = MagicMock(return_value={"id": 25, "name": "pikachu"})
     client._transport.request = MagicMock(return_value=mock_response)
 

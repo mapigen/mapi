@@ -10,7 +10,7 @@ ParameterLocation = Literal["query", "path", "header", "cookie", "body"]
 NonEmptyStr = Annotated[str, Meta(min_length=1)]
 
 
-class Parameter(msgspec.Struct, frozen=True, tag="inline"):
+class Parameter(msgspec.Struct, frozen=True, tag="inline", gc=False, cache_hash=True):
     """A fully defined API parameter."""
     name: NonEmptyStr
     in_: ParameterLocation = msgspec.field(name="in")
@@ -19,7 +19,7 @@ class Parameter(msgspec.Struct, frozen=True, tag="inline"):
     required: bool = False
 
 
-class ParameterRef(msgspec.Struct, frozen=True, tag="ref"):
+class ParameterRef(msgspec.Struct, frozen=True, tag="ref", gc=False, cache_hash=True):
     """A $ref pointer to a reusable parameter component."""
     ref: NonEmptyStr = msgspec.field(name="$ref")
 
@@ -31,13 +31,13 @@ class ParameterRef(msgspec.Struct, frozen=True, tag="ref"):
 ParameterUnion = Union[Parameter, ParameterRef]
 
 
-class Server(msgspec.Struct, frozen=True):
+class Server(msgspec.Struct, frozen=True, gc=False):
     url: NonEmptyStr
     description: str = ""
     variables: Optional[Dict[str, Any]] = None
 
 
-class Operation(msgspec.Struct, frozen=True):
+class Operation(msgspec.Struct, frozen=True, gc=False):
     """A single API operation."""
     service: NonEmptyStr
     path: NonEmptyStr
@@ -49,13 +49,13 @@ class Operation(msgspec.Struct, frozen=True):
     deprecated: bool = False
 
 
-class Components(msgspec.Struct, frozen=True):
+class Components(msgspec.Struct, frozen=True, gc=False):
     """Reusable OpenAPI components (parameters, schemas)."""
     parameters: Dict[str, Parameter] = msgspec.field(default_factory=dict)
     schemas: Dict[str, Dict[str, Any]] = msgspec.field(default_factory=dict)
 
 
-class ServiceData(msgspec.Struct, frozen=True):
+class ServiceData(msgspec.Struct, frozen=True, gc=False):
     """Complete processed service definition (from utilize.json)."""
     format_version: Annotated[int, Meta(ge=3)]
     service_name: NonEmptyStr

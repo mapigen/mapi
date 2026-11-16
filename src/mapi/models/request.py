@@ -5,7 +5,7 @@ import msgspec
 from .domain import HttpMethod
 
 
-class RequestConfig(msgspec.Struct, frozen=True):
+class RequestConfig(msgspec.Struct, frozen=True, gc=False):
     """Fully resolved HTTP request parameters."""
     method: HttpMethod
     url: str

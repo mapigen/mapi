@@ -43,6 +43,9 @@ class DiskLoader:
     ) -> None:
         self.data_dir = data_dir or _default_data_dir()
         self.registry_path = registry_path or _default_registry_path()
+        self._dctx = zstd.ZstdDecompressor()
+        self._service_decoder = msgspec.json.Decoder(ServiceData)
+        self._registry_decoder = msgspec.json.Decoder(ServiceRegistry)
 
     def load_registry(self) -> ServiceRegistry:
         """Load and decode services.json into a typed ServiceRegistry."""
@@ -52,7 +55,7 @@ class DiskLoader:
                 "Ensure data is populated or set MAPI_REGISTRY_PATH.",
             )
         log.debug("Loading registry from %s", self.registry_path)
-        return msgspec.json.decode(self.registry_path.read_bytes(), type=ServiceRegistry)
+        return self._registry_decoder.decode(self.registry_path.read_bytes())
 
     def load_service(self, provider: str, api: str, source: str) -> ServiceData:
         """Load utilize.json or utilize.json.zst for a service."""
@@ -62,12 +65,11 @@ class DiskLoader:
 
         if uncompressed.exists():
             log.debug("Loading uncompressed %s/%s/%s", provider, api, source)
-            return msgspec.json.decode(uncompressed.read_bytes(), type=ServiceData)
+            return self._service_decoder.decode(uncompressed.read_bytes())
 
         if compressed.exists():
             log.debug("Loading compressed %s/%s/%s", provider, api, source)
-            dctx = zstd.ZstdDecompressor()
-            return msgspec.json.decode(dctx.decompress(compressed.read_bytes()), type=ServiceData)
+            return self._service_decoder.decode(self._dctx.decompress(compressed.read_bytes()))
 
         raise ServiceNotFoundError(
             f"Service data for '{provider}/{api}/{source}' not found. "
