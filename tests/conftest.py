@@ -73,3 +73,13 @@ def sample_registry() -> ServiceRegistry:
             },
         },
     )
+
+
+@pytest.fixture(scope="session")
+def service_data_fixture(sample_service_data: ServiceData) -> ServiceData:
+    return sample_service_data
+
+
+@pytest.fixture(scope="session")
+def service_registry_fixture(sample_registry: ServiceRegistry) -> ServiceRegistry:
+    return sample_registry
