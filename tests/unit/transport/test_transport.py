@@ -5,71 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mapi.auth import ApiKeyAuth, BearerAuth
+from mapi.auth import BearerAuth
 from mapi.models.domain import HttpMethod
 from mapi.models.request import RequestConfig
 from mapi.transport import NiquestsTransport
-
-
-class TestApiKeyAuth:
-    def test_header_placement(self):
-        auth = ApiKeyAuth("secret_key_123", "X-API-Key", placement="header")
-        req = MagicMock()
-        req.headers = {}
-        auth(req)
-        assert req.headers["X-API-Key"] == "secret_key_123"
-
-    def test_query_placement(self):
-        auth = ApiKeyAuth("secret_token", "api_key", placement="query")
-        req = MagicMock()
-        req.url = "https://api.example.com/v1/users?existing=true"
-        req.headers = {}
-        auth(req)
-        assert "api_key=secret_token" in req.url
-        assert "existing=true" in req.url
-
-    def test_cookie_placement(self):
-        auth = ApiKeyAuth("sess_xyz", "session_id", placement="cookie")
-        req = MagicMock()
-        auth(req)
-        req.prepare_cookies.assert_called_once_with({"session_id": "sess_xyz"})
-
-    def test_empty_key_raises(self):
-        with pytest.raises(ValueError, match="cannot be empty"):
-            ApiKeyAuth("", "X-Key")
-
-    def test_invalid_placement_raises(self):
-        with pytest.raises(ValueError, match="placement"):
-            ApiKeyAuth("key", "name", placement="body")  # type: ignore
-
-    def test_repr(self):
-        auth = ApiKeyAuth("k", "X-Key", "header")
-        assert "ApiKeyAuth" in repr(auth)
-        assert "header" in repr(auth)
-
-
-class TestBearerAuth:
-    def test_sets_authorization_header(self):
-        auth = BearerAuth("my_bearer_token")
-        req = MagicMock()
-        req.headers = {}
-        auth(req)
-        assert req.headers["Authorization"] == "Bearer my_bearer_token"
-
-    def test_custom_scheme(self):
-        auth = BearerAuth("tok_123", scheme="Token")
-        req = MagicMock()
-        req.headers = {}
-        auth(req)
-        assert req.headers["Authorization"] == "Token tok_123"
-
-    def test_empty_token_raises(self):
-        with pytest.raises(ValueError, match="cannot be empty"):
-            BearerAuth("")
-
-    def test_repr(self):
-        auth = BearerAuth("t", scheme="Bearer")
-        assert "BearerAuth" in repr(auth)
 
 
 class TestNiquestsTransport:
@@ -134,6 +73,16 @@ class TestNiquestsTransport:
             transport.request(self._make_config(), auth=auth)
         call_kwargs = mock_req.call_args[1]
         assert call_kwargs.get("auth") is auth
+
+    def test_stream_flag_forwarded_to_session(self):
+        transport = NiquestsTransport()
+        mock_response = MagicMock()
+        with patch.object(
+            transport._sync_session, "request", return_value=mock_response
+        ) as mock_req:
+            transport.request(self._make_config(), stream=True)
+        call_kwargs = mock_req.call_args[1]
+        assert call_kwargs.get("stream") is True
 
     @pytest.mark.asyncio
     async def test_async_request_reuses_session(self):

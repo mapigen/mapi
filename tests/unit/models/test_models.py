@@ -1,4 +1,4 @@
-# tests/unit/test_models.py
+# tests/unit/models/test_models.py
 from __future__ import annotations
 
 import msgspec
@@ -7,10 +7,12 @@ import pytest
 from mapi.exceptions import (
     MapiError,
     RateLimitError,
+    SpecUpdateAvailableWarning,
     TransportError,
 )
 from mapi.models import (
     ClientConfig,
+    HeadersDict,
     MapiResult,
     Parameter,
     ParameterRef,
@@ -18,6 +20,7 @@ from mapi.models import (
     RequestConfig,
     ResponseMetadata,
     ServiceData,
+    SpecDiffResult,
 )
 
 
@@ -92,6 +95,10 @@ class TestClientConfig:
         assert cfg.validate_on_execute is True
         assert cfg.pinned_services == ()
         assert cfg.cache_maxsize == 64
+        assert cfg.multiplexed is True
+        assert cfg.retries == 0
+        assert cfg.server_variables == {}
+        assert cfg.default_headers == {"User-Agent": "mapi/0.1.0", "Accept": "application/json"}
 
     def test_from_env(self, monkeypatch):
         monkeypatch.setenv("MAPI_CACHE_MAXSIZE", "128")
@@ -113,6 +120,55 @@ class TestRequestConfig:
         assert rc.headers == {}
         assert rc.json_body is None
         assert rc.timeout == 30.0
+
+    def test_to_curl_basic_get(self):
+        cfg = RequestConfig(method="GET", url="https://api.example.com/v1/users")
+        curl_str = cfg.to_curl()
+        assert curl_str == "curl -X GET 'https://api.example.com/v1/users'"
+
+    def test_to_curl_with_query_params(self):
+        cfg = RequestConfig(
+            method="GET",
+            url="https://api.example.com/search",
+            params={"q": "ditto", "limit": 10},
+        )
+        curl_str = cfg.to_curl()
+        assert "curl -X GET 'https://api.example.com/search?q=ditto&limit=10'" in curl_str
+
+    def test_to_curl_redact_auth_default(self):
+        cfg = RequestConfig(
+            method="POST",
+            url="https://api.example.com/data",
+            headers={
+                "Authorization": "Bearer secret_tok_123",
+                "X-Api-Key": "my_secret_key",
+                "Content-Type": "application/json",
+            },
+        )
+        curl_str = cfg.to_curl()
+        assert "-H 'Authorization: [REDACTED]'" in curl_str
+        assert "-H 'X-Api-Key: [REDACTED]'" in curl_str
+        assert "-H 'Content-Type: application/json'" in curl_str
+
+    def test_to_curl_no_redact_auth(self):
+        cfg = RequestConfig(
+            method="POST",
+            url="https://api.example.com/data",
+            headers={"Authorization": "Bearer secret_tok_123"},
+        )
+        curl_str = cfg.to_curl(redact_auth=False)
+        assert "-H 'Authorization: Bearer secret_tok_123'" in curl_str
+
+    def test_to_curl_with_json_body_and_escaping(self):
+        cfg = RequestConfig(
+            method="POST",
+            url="https://api.example.com/users",
+            json_body={"name": "O'Connor", "age": 30},
+        )
+        curl_str = cfg.to_curl()
+        assert "-X POST 'https://api.example.com/users'" in curl_str
+        assert "-d '" in curl_str
+        assert "O'\\''Connor" in curl_str
 
 
 class TestResponseMetadata:
@@ -143,6 +199,31 @@ class TestResponseMetadata:
         decoded = msgspec.json.decode(msgspec.json.encode(m), type=ResponseMetadata)
         assert decoded == m
 
+    def test_header_properties(self):
+        headers = HeadersDict(
+            {
+                "Content-Type": "application/json",
+                "ETag": "W/123",
+                "Retry-After": "10.5",
+                "X-RateLimit-Limit": "1000",
+                "X-RateLimit-Remaining": "999",
+                "X-RateLimit-Reset": "1700000000",
+            }
+        )
+        m = ResponseMetadata(
+            service="svc",
+            operation="op",
+            duration_ms=10,
+            status="success",
+            headers=headers,
+        )
+        assert m.content_type == "application/json"
+        assert m.etag == "W/123"
+        assert m.retry_after == 10.5
+        assert m.rate_limit_limit == 1000
+        assert m.rate_limit_remaining == 999
+        assert m.rate_limit_reset == 1700000000
+
 
 class TestMapiResult:
     def test_frozen(self):
@@ -155,6 +236,14 @@ class TestMapiResult:
         meta = ResponseMetadata(service="s", operation="o", duration_ms=1, status="error")
         result = MapiResult(data=None, metadata=meta)
         assert result.data is None
+
+
+class TestSpecDiffResult:
+    def test_spec_diff_result_defaults(self):
+        diff = SpecDiffResult(has_diff=True, provider="p", api="REST", added_operations=["op1"])
+        assert diff.has_diff is True
+        assert diff.added_operations == ["op1"]
+        assert diff.removed_operations == []
 
 
 class TestExceptions:
@@ -172,6 +261,9 @@ class TestExceptions:
         e = RateLimitError("429", http_status=429)
         assert isinstance(e, TransportError)
         assert isinstance(e, MapiError)
+
+    def test_spec_warning_inheritance(self):
+        assert issubclass(SpecUpdateAvailableWarning, UserWarning)
 
     def test_exception_chaining(self):
         cause = ValueError("original")

@@ -1,13 +1,11 @@
-# tests/unit/test_tools.py
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
+from tests import helpers
 from tools import pipeline, utils
-
-from .. import helpers
 
 
 def test_compress_decompress_zstd():

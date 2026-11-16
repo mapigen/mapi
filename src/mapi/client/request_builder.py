@@ -9,7 +9,7 @@ import msgspec
 
 from ..cache.service_cache import ServiceCache
 from ..exceptions import ServiceNotFoundError
-from ..models.domain import Parameter, ParameterRef
+from ..models.domain import Parameter, ParameterRef, ServiceData
 from ..models.request import RequestConfig
 from ..validation.param_validator import ParameterValidator
 
@@ -17,6 +17,11 @@ if TYPE_CHECKING:
     from ..cache.hot_cache import HotOpCache
 
 log = logging.getLogger(__name__)
+
+_DEFAULT_HEADERS: dict[str, str] = {
+    "User-Agent": "mapi/0.1.0",
+    "Accept": "application/json",
+}
 
 
 class RequestBuilder:
@@ -53,12 +58,19 @@ class RequestBuilder:
         service_name = f"{provider}/{api}/{source}"
         cache_key = (provider, api, source, operation)
 
-        # 1. Retrieve operation (check HotOpCache first)
+        # 1. Retrieve operation (check HotOpCache first, load ServiceData lazily on miss)
         op = self._hot_cache.get(cache_key) if self._hot_cache is not None else None
-        service_data = self._cache.get(provider, api, source)
+        service_data: ServiceData | None = None
+
+        def _get_service_data() -> ServiceData:
+            nonlocal service_data
+            if service_data is None:
+                service_data = self._cache.get(provider, api, source)
+            return service_data
 
         if op is None:
-            op = service_data.operations.get(operation)
+            s_data = _get_service_data()
+            op = s_data.operations.get(operation)
             if op is None:
                 raise ServiceNotFoundError(
                     f"Operation '{operation}' not found in '{service_name}'",
@@ -71,7 +83,13 @@ class RequestBuilder:
         # 2. Parameter schema validation
         if self._validator is not None:
             self._validator.validate(
-                provider, api, source, operation, kwargs, service_data=service_data, op_details=op
+                provider,
+                api,
+                source,
+                operation,
+                kwargs,
+                service_data=_get_service_data(),
+                op_details=op,
             )
 
         # 3. Resolve server by tag/pattern or fallback
@@ -84,34 +102,36 @@ class RequestBuilder:
 
         if base_url:
             resolved_base_url = base_url
-        elif service_data.servers:
-            server = service_data.servers[0]
-            if effective_tag:
-                tag_lower = str(effective_tag).lower()
-                for s in service_data.servers:
-                    if tag_lower in s.url.lower() or (
-                        s.description and tag_lower in s.description.lower()
-                    ):
-                        server = s
-                        break
-            url = server.url
-            if "{" in url and "}" in url and server.variables:
-                vars_map: dict[str, str] = {}
-                for var_name, var_def in server.variables.items():
-                    if isinstance(var_def, dict) and "default" in var_def:
-                        vars_map[var_name] = str(var_def["default"])
-                    elif isinstance(var_def, (str, int, float, bool)):
-                        vars_map[var_name] = str(var_def)
-                if server_variables:
-                    vars_map.update(server_variables)
-                for var_name in server.variables:
-                    if var_name in kwargs:
-                        vars_map[var_name] = str(kwargs.pop(var_name))
-                with contextlib.suppress(KeyError):
-                    url = url.format(**vars_map)
-            resolved_base_url = url
         else:
-            resolved_base_url = None
+            s_data = _get_service_data()
+            if s_data.servers:
+                server = s_data.servers[0]
+                if effective_tag:
+                    tag_lower = str(effective_tag).lower()
+                    for s in s_data.servers:
+                        if tag_lower in s.url.lower() or (
+                            s.description and tag_lower in s.description.lower()
+                        ):
+                            server = s
+                            break
+                url = server.url
+                if "{" in url and "}" in url and server.variables:
+                    vars_map: dict[str, str] = {}
+                    for var_name, var_def in server.variables.items():
+                        if isinstance(var_def, dict) and "default" in var_def:
+                            vars_map[var_name] = str(var_def["default"])
+                        elif isinstance(var_def, (str, int, float, bool)):
+                            vars_map[var_name] = str(var_def)
+                    if server_variables:
+                        vars_map.update(server_variables)
+                    for var_name in server.variables:
+                        if var_name in kwargs:
+                            vars_map[var_name] = str(kwargs.pop(var_name))
+                    with contextlib.suppress(KeyError):
+                        url = url.format(**vars_map)
+                resolved_base_url = url
+            else:
+                resolved_base_url = None
 
         if not resolved_base_url:
             raise ServiceNotFoundError(
@@ -123,15 +143,14 @@ class RequestBuilder:
         path_params: dict[str, Any] = {}
         query_params: dict[str, Any] = {}
         body_params: dict[str, Any] = {}
-        headers: dict[str, str] = {
-            "User-Agent": "mapi/0.1.0",
-            "Accept": "application/json",
-        }
+        headers: dict[str, str] = dict(_DEFAULT_HEADERS)
         if default_headers:
             headers.update(default_headers)
 
         effective_idempotent = (
-            idempotent or kwargs.pop("_idempotent", False) or kwargs.pop("idempotent", False)
+            idempotent
+            or ("_idempotent" in kwargs and kwargs.pop("_idempotent"))
+            or ("idempotent" in kwargs and kwargs.pop("idempotent"))
         )
         if (
             effective_idempotent
@@ -142,7 +161,8 @@ class RequestBuilder:
 
         for param_union in op.parameters:
             if isinstance(param_union, ParameterRef):
-                param: Parameter = service_data.components.parameters[param_union.component_name]
+                s_data = _get_service_data()
+                param: Parameter = s_data.components.parameters[param_union.component_name]
             else:
                 param = param_union
 

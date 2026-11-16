@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import msgspec
 import pytest
 
 from mapi.cache import ServiceCache
 from mapi.exceptions import ServiceNotFoundError, ValidationError
+from mapi.models.domain import ServiceData
 from mapi.validation import ParameterValidator
 
 
@@ -37,10 +39,6 @@ class TestParameterValidator:
             v.validate("p", "a", "s", "nonexistent_op", {})
 
     def test_operation_with_no_parameters_passes(self):
-        import msgspec
-
-        from mapi.models.domain import ServiceData
-
         sd_dict = {
             "format_version": 3,
             "service_name": "simple",

@@ -13,6 +13,7 @@ from .domain import (
 from .registry import ApiInfo, MetadataFile, ServiceRegistry
 from .request import BatchRequest, RequestConfig
 from .response import HeadersDict, MapiResult, ResponseMetadata
+from .spec import SpecDiffResult
 
 __all__ = [
     "Parameter",
@@ -33,4 +34,5 @@ __all__ = [
     "ResponseMetadata",
     "HeadersDict",
     "MapiResult",
+    "SpecDiffResult",
 ]

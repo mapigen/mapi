@@ -35,6 +35,13 @@ class TestServiceCache:
         assert info["pinned_count"] == 1
         assert "p:a:s" in info["pinned_keys"]
 
+    def test_put_stores_and_updates_pinned(self, sample_service_data):
+        cache, loader = self._create_cache(sample_service_data)
+        cache.put("p2", "a2", "s2", sample_service_data, pinned=True)
+        retrieved = cache.get("p2", "a2", "s2")
+        assert retrieved.service_name == sample_service_data.service_name
+        loader.load_service.assert_not_called()
+
     def test_clear_evicts_cache(self, sample_service_data):
         cache, loader = self._create_cache(sample_service_data)
         cache.get("p", "a", "s")
