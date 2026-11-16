@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Dict
 from dataclasses import asdict
 
+import msgspec
 from mapi import Mapi, MapiError
 from .helpers import result_reporter, VALID_CALL_4XX
 
@@ -21,11 +22,12 @@ SAVE_PAYLOAD_TOGGLE: Dict[str, bool] = {
     "discord": True,
     "github": True,
     "pokeapi": True,
+    "REST": True,
 }
 
 def _save_payload_if_enabled(provider_name: str, api_name: str, op_name: str, response_wrapper: Any) -> str | None:
     """Checks the toggle and saves the full response payload if enabled."""
-    if SAVE_PAYLOAD_TOGGLE.get(api_name, False):
+    if SAVE_PAYLOAD_TOGGLE.get(provider_name, False) or SAVE_PAYLOAD_TOGGLE.get(api_name, False):
         tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
         tmp_dir.mkdir(exist_ok=True)
 
@@ -35,9 +37,9 @@ def _save_payload_if_enabled(provider_name: str, api_name: str, op_name: str, re
 
         # Prepare data for serialization
         data_to_save: Dict[str, Any] = {}
-        if hasattr(response_wrapper, "metadata"):
+        if hasattr(response_wrapper, "metadata") and response_wrapper.metadata is not None:
             meta = response_wrapper.metadata
-            data_to_save["metadata"] = asdict(meta) if hasattr(meta, "__dataclass_fields__") else meta.__dict__ if hasattr(meta, "__dict__") else str(meta)
+            data_to_save["metadata"] = msgspec.to_builtins(meta)
         if hasattr(response_wrapper, "data"):
             data_to_save["data"] = response_wrapper.data
         elif isinstance(response_wrapper, dict):
@@ -71,6 +73,9 @@ def run_test_operation(
                 api_proxy = getattr(provider_proxy, api_name)
 
         response_wrapper = api_proxy(op_name, **kwargs)
+        saved_file = _save_payload_if_enabled(provider_name, api_name, op_name, response_wrapper)
+        if saved_file:
+            print(f"[mapi] Response payload logged to: {saved_file}")
         metadata = getattr(response_wrapper, "metadata", None)
         data = getattr(response_wrapper, "data", None)
 

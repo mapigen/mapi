@@ -30,7 +30,7 @@ def test_pokeapi_integration(client: Mapi):
     op_name = ""
     try:
         # --- Test 1: Get Ditto ---
-        op_name = "api_v2_pokemon_retrieve"
+        op_name = "pokemon_retrieve"
         pokemon_id_ditto = "ditto"
 
         def assert_ditto_data(data: Dict[str, Any]):
@@ -47,7 +47,7 @@ def test_pokeapi_integration(client: Mapi):
         )
 
         # --- Test 2: Get Pikachu ---
-        op_name = "api_v2_pokemon_retrieve"
+        op_name = "pokemon_retrieve"
         pokemon_id_pikachu = "pikachu"
 
         def assert_pikachu_data(data: Dict[str, Any]):

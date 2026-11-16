@@ -1,6 +1,8 @@
-.PHONY: help lint test test-cov populate validate clean
+.PHONY: help lint test test-cov populate validate clean show-format show-data
 
-PYTHON := PYTHONPATH=src:tools python3
+VENV_BIN := $(shell if [ -d ".venv/bin" ]; then echo ".venv/bin/"; fi)
+PYTHON := PYTHONPATH=src:tools:. $(VENV_BIN)python3
+PYTEST := $(VENV_BIN)pytest
 TOOLS := $(PYTHON) -m tools
 
 help: ## Show this help message
@@ -12,10 +14,16 @@ lint: ## Run ruff / linter
 	ruff check .
 
 test: ## Run test suite
-	pytest -v tests/
+	$(PYTEST) -v tests/
 
 test-cov: ## Run test suite with coverage
-	pytest --cov=mapi --cov-report=term-missing tests/
+	$(PYTEST) --cov=mapi --cov-report=term-missing tests/
+
+show-format: ## Display the standard SDK response format
+	@$(PYTHON) utils/show_format.py
+
+show-data: ## Pretty-print a response file. Usage: make show-data tmp/file.json
+	@$(PYTHON) utils/show_format.py $(filter-out $@,$(MAKECMDGOALS))
 
 populate: ## Populate API data from registry sources
 	$(TOOLS).populate $(ARGS)

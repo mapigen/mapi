@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# api data / compressed files
+*.lz4
+*metadata.yml
+*openapi.yml
+*.zst
+*openapi.json
+*utilize.json
+*schemas.py
+
+# test data / logs
+pytest_report.xml
+tests/integration/*_generated.py
+tmp/
+prof/
+*.prof
