@@ -20,23 +20,25 @@ from ..exceptions import (
     ValidationError,
 )
 from ..models.request import BatchRequest, RequestConfig
-from ..models.response import HeadersDict, MapiResult, ResponseMetadata
+from ..models.response import _EMPTY_HEADERS, HeadersDict, MapiResult, ResponseMetadata
 
 if TYPE_CHECKING:
     from .client import Mapi
 
 log = logging.getLogger("mapi")
 T = TypeVar("T")
+_now = datetime.now
+_UTC = UTC
 
 
 def _utc_now_iso() -> str:
     """Return ISO 8601 UTC timestamp."""
-    return datetime.now(UTC).isoformat()
+    return _now(_UTC).isoformat()
 
 
 def _to_ms(seconds: float) -> int:
     """Convert elapsed seconds to integer milliseconds (non-negative)."""
-    return max(0, int(round(seconds * 1000)))
+    return int(round(seconds * 1000)) if seconds > 0 else 0
 
 
 def _measure(fn: Callable[..., T], *args: Any, **kwargs: Any) -> tuple[T, float]:
@@ -69,7 +71,7 @@ def _build_result(
             operation=operation,
             duration_ms=_to_ms(ops_time),
             network_duration_ms=_to_ms(net_time),
-            headers=headers or {},
+            headers=headers if headers is not None else _EMPTY_HEADERS,
             status=status,
             http_status=status_code,
             timestamp=_utc_now_iso(),
@@ -112,37 +114,53 @@ def _extract_call_flags(
     _stream: bool,
 ) -> tuple[Any, bool, bool, bool, bool]:
     """Efficiently extract special control flags from kwargs with minimal pop overhead."""
-    target_type = (
-        _type
-        or ("_type" in kwargs and kwargs.pop("_type"))
-        or ("target_type" in kwargs and kwargs.pop("target_type"))
-        or None
-    )
-    raw = (
-        _raw
-        or ("_raw" in kwargs and kwargs.pop("_raw"))
-        or ("raw" in kwargs and kwargs.pop("raw"))
-        or False
-    )
-    dry_run = (
-        _dry_run
-        or ("_dry_run" in kwargs and kwargs.pop("_dry_run"))
-        or ("dry_run" in kwargs and kwargs.pop("dry_run"))
-        or False
-    )
-    idempotent = (
-        _idempotent
-        or ("_idempotent" in kwargs and kwargs.pop("_idempotent"))
-        or ("idempotent" in kwargs and kwargs.pop("idempotent"))
-        or False
-    )
-    stream = (
-        _stream
-        or ("_stream" in kwargs and kwargs.pop("_stream"))
-        or ("stream" in kwargs and kwargs.pop("stream"))
-        or False
-    )
+    target_type = _type
+    raw = _raw
+    dry_run = _dry_run
+    idempotent = _idempotent
+    stream = _stream
+
+    if kwargs:
+        if "_type" in kwargs:
+            target_type = kwargs.pop("_type")
+        elif "target_type" in kwargs:
+            target_type = kwargs.pop("target_type")
+
+        if "_raw" in kwargs:
+            raw = raw or bool(kwargs.pop("_raw"))
+        elif "raw" in kwargs:
+            raw = raw or bool(kwargs.pop("raw"))
+
+        if "_dry_run" in kwargs:
+            dry_run = dry_run or bool(kwargs.pop("_dry_run"))
+        elif "dry_run" in kwargs:
+            dry_run = dry_run or bool(kwargs.pop("dry_run"))
+
+        if "_idempotent" in kwargs:
+            idempotent = idempotent or bool(kwargs.pop("_idempotent"))
+        elif "idempotent" in kwargs:
+            idempotent = idempotent or bool(kwargs.pop("idempotent"))
+
+        if "_stream" in kwargs:
+            stream = stream or bool(kwargs.pop("_stream"))
+        elif "stream" in kwargs:
+            stream = stream or bool(kwargs.pop("stream"))
+
     return target_type, raw, dry_run, idempotent, stream
+
+
+def _extract_response_headers(response: Any) -> HeadersDict:
+    """Extract and wrap response headers efficiently, avoiding MagicMock attribute thrashing."""
+    resp_dict = getattr(response, "__dict__", None)
+    raw = resp_dict.get("headers") if resp_dict is not None else getattr(response, "headers", None)
+
+    if raw is None:
+        return _EMPTY_HEADERS
+    if isinstance(raw, HeadersDict):
+        return raw
+    if isinstance(raw, dict) or Mapping in type(raw).__mro__:
+        return HeadersDict(raw)
+    return _EMPTY_HEADERS
 
 
 class RequestExecutor:
@@ -173,26 +191,19 @@ class RequestExecutor:
                 source = "openapi"
 
         service_name = f"{provider}/{api}/{source}"
-        cfg = getattr(self._client, "_config", None)
-        base_url = cfg.base_url if cfg else None
-        server_variables = cfg.server_variables if cfg else None
-        default_headers = cfg.default_headers if cfg else None
-        server_pattern = cfg.server_pattern if cfg else None
-        server_tag = cfg.server_tag if cfg else None
-        timeout = cfg.default_timeout if cfg else 30.0
-
+        cfg = self._client._config
         config = self._client._builder.build(
             provider,
             api,
             source,
             operation,
-            base_url=base_url,
-            server_variables=server_variables,
-            default_headers=default_headers,
-            server_pattern=server_pattern,
-            server_tag=server_tag,
+            base_url=cfg.base_url,
+            server_variables=cfg.server_variables,
+            default_headers=cfg.default_headers,
+            server_pattern=cfg.server_pattern,
+            server_tag=cfg.server_tag,
             idempotent=idempotent,
-            timeout=timeout,
+            timeout=cfg.default_timeout,
             **kwargs,
         )
         return service_name, config
@@ -214,19 +225,14 @@ class RequestExecutor:
 
         if isinstance(content, (bytes, bytearray, memoryview)) and content:
             if target_type is not None:
-                decoders = getattr(self._client, "_typed_decoders", None)
-                if decoders is not None:
-                    decoder = decoders.get(target_type)
-                    if decoder is None:
-                        decoder = msgspec.json.Decoder(target_type)
-                        decoders[target_type] = decoder
-                    return decoder.decode(content)
-                return msgspec.json.decode(content, type=target_type)
+                decoders = self._client._typed_decoders
+                decoder = decoders.get(target_type)
+                if decoder is None:
+                    decoder = msgspec.json.Decoder(target_type)
+                    decoders[target_type] = decoder
+                return decoder.decode(content)
             try:
-                decoder = getattr(self._client, "_json_decoder", None)
-                if decoder is not None:
-                    return decoder.decode(content)
-                return msgspec.json.decode(content)
+                return self._client._json_decoder.decode(content)
             except Exception:
                 pass
         if hasattr(response, "json") and callable(response.json):
@@ -277,15 +283,13 @@ class RequestExecutor:
             )
 
         try:
-            auth = getattr(self._client, "_auth", None)
+            auth = self._client._auth
             t_net = time.perf_counter()
             response = self._client._transport.request(config, auth=auth, stream=stream)
             net_time = time.perf_counter() - t_net
 
-            raw_headers = getattr(response, "headers", None)
-            resp_headers = (
-                HeadersDict(raw_headers) if isinstance(raw_headers, Mapping) else HeadersDict()
-            )
+            resp_headers = _extract_response_headers(response)
+
             if stream:
                 data = getattr(response, "iter_content", lambda: response)()
                 post_time = 0.0
@@ -327,9 +331,11 @@ class RequestExecutor:
             kwargs, _type, _raw, _dry_run, _idempotent, _stream
         )
 
-        (service_name, config), prep_time = _measure(
-            self.prepare_request, provider, api, source, operation, kwargs, idempotent=idempotent
+        t_start = time.perf_counter()
+        service_name, config = self.prepare_request(
+            provider, api, source, operation, kwargs, idempotent=idempotent
         )
+        prep_time = time.perf_counter() - t_start
 
         if dry_run:
             return MapiResult(
@@ -347,19 +353,20 @@ class RequestExecutor:
             )
 
         try:
-            auth = getattr(self._client, "_auth", None)
-            response, net_time = await _ameasure(
-                self._client._transport.arequest(config, auth=auth, stream=stream)
-            )
-            raw_headers = getattr(response, "headers", None)
-            resp_headers = (
-                HeadersDict(raw_headers) if isinstance(raw_headers, Mapping) else HeadersDict()
-            )
+            auth = self._client._auth
+            t_net = time.perf_counter()
+            response = await self._client._transport.arequest(config, auth=auth, stream=stream)
+            net_time = time.perf_counter() - t_net
+
+            resp_headers = _extract_response_headers(response)
+
             if stream:
                 data = getattr(response, "iter_content", lambda: response)()
                 post_time = 0.0
             else:
-                data, post_time = _measure(self.decode_response, response, target_type, raw)
+                t_post = time.perf_counter()
+                data = self.decode_response(response, target_type, raw)
+                post_time = time.perf_counter() - t_post
 
             return _build_result(
                 service_name,

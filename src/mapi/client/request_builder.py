@@ -9,7 +9,7 @@ import msgspec
 
 from ..cache.service_cache import ServiceCache
 from ..exceptions import ServiceNotFoundError
-from ..models.domain import Parameter, ParameterRef, ServiceData
+from ..models.domain import Parameter, ParameterRef
 from ..models.request import RequestConfig
 from ..validation.param_validator import ParameterValidator
 
@@ -56,29 +56,19 @@ class RequestBuilder:
         **kwargs: Any,
     ) -> RequestConfig:
         service_name = f"{provider}/{api}/{source}"
-        cache_key = (provider, api, source, operation)
 
-        # 1. Retrieve operation (check HotOpCache first, load ServiceData lazily on miss)
-        op = self._hot_cache.get(cache_key) if self._hot_cache is not None else None
-        service_data: ServiceData | None = None
-
-        def _get_service_data() -> ServiceData:
-            nonlocal service_data
-            if service_data is None:
-                service_data = self._cache.get(provider, api, source)
-            return service_data
-
+        # 1. Retrieve service definition and operation
+        service_data = self._cache.get(provider, api, source)
+        op = service_data.operations.get(operation)
         if op is None:
-            s_data = _get_service_data()
-            op = s_data.operations.get(operation)
+            if self._hot_cache is not None:
+                op = self._hot_cache.get((provider, api, source, operation))
             if op is None:
                 raise ServiceNotFoundError(
                     f"Operation '{operation}' not found in '{service_name}'",
                     service=service_name,
                     operation=operation,
                 )
-            if self._hot_cache is not None:
-                self._hot_cache.put(cache_key, op)
 
         # 2. Parameter schema validation
         if self._validator is not None:
@@ -88,50 +78,47 @@ class RequestBuilder:
                 source,
                 operation,
                 kwargs,
-                service_data=_get_service_data(),
+                service_data=service_data,
                 op_details=op,
             )
 
         # 3. Resolve server by tag/pattern or fallback
-        effective_tag = (
-            kwargs.pop("server_tag", None)
-            or kwargs.pop("server_pattern", None)
-            or server_tag
-            or server_pattern
-        )
+        effective_tag = None
+        if kwargs and ("server_tag" in kwargs or "server_pattern" in kwargs):
+            effective_tag = kwargs.pop("server_tag", None) or kwargs.pop("server_pattern", None)
+        if not effective_tag:
+            effective_tag = server_tag or server_pattern
 
         if base_url:
             resolved_base_url = base_url
+        elif service_data.servers:
+            server = service_data.servers[0]
+            if effective_tag:
+                tag_lower = str(effective_tag).lower()
+                for s in service_data.servers:
+                    if tag_lower in s.url.lower() or (
+                        s.description and tag_lower in s.description.lower()
+                    ):
+                        server = s
+                        break
+            url = server.url
+            if "{" in url and "}" in url and server.variables:
+                vars_map: dict[str, str] = {}
+                for var_name, var_def in server.variables.items():
+                    if isinstance(var_def, dict) and "default" in var_def:
+                        vars_map[var_name] = str(var_def["default"])
+                    elif isinstance(var_def, (str, int, float, bool)):
+                        vars_map[var_name] = str(var_def)
+                if server_variables:
+                    vars_map.update(server_variables)
+                for var_name in server.variables:
+                    if var_name in kwargs:
+                        vars_map[var_name] = str(kwargs.pop(var_name))
+                with contextlib.suppress(KeyError):
+                    url = url.format(**vars_map)
+            resolved_base_url = url
         else:
-            s_data = _get_service_data()
-            if s_data.servers:
-                server = s_data.servers[0]
-                if effective_tag:
-                    tag_lower = str(effective_tag).lower()
-                    for s in s_data.servers:
-                        if tag_lower in s.url.lower() or (
-                            s.description and tag_lower in s.description.lower()
-                        ):
-                            server = s
-                            break
-                url = server.url
-                if "{" in url and "}" in url and server.variables:
-                    vars_map: dict[str, str] = {}
-                    for var_name, var_def in server.variables.items():
-                        if isinstance(var_def, dict) and "default" in var_def:
-                            vars_map[var_name] = str(var_def["default"])
-                        elif isinstance(var_def, (str, int, float, bool)):
-                            vars_map[var_name] = str(var_def)
-                    if server_variables:
-                        vars_map.update(server_variables)
-                    for var_name in server.variables:
-                        if var_name in kwargs:
-                            vars_map[var_name] = str(kwargs.pop(var_name))
-                    with contextlib.suppress(KeyError):
-                        url = url.format(**vars_map)
-                resolved_base_url = url
-            else:
-                resolved_base_url = None
+            resolved_base_url = None
 
         if not resolved_base_url:
             raise ServiceNotFoundError(
@@ -143,17 +130,14 @@ class RequestBuilder:
         path_params: dict[str, Any] = {}
         query_params: dict[str, Any] = {}
         body_params: dict[str, Any] = {}
-        headers: dict[str, str] = dict(_DEFAULT_HEADERS)
-        if default_headers:
-            headers.update(default_headers)
-
-        effective_idempotent = (
-            idempotent
-            or ("_idempotent" in kwargs and kwargs.pop("_idempotent"))
-            or ("idempotent" in kwargs and kwargs.pop("idempotent"))
+        headers: dict[str, str] = (
+            {**_DEFAULT_HEADERS, **default_headers}
+            if default_headers is not None
+            else dict(_DEFAULT_HEADERS)
         )
+
         if (
-            effective_idempotent
+            idempotent
             and op.method in ("POST", "PUT", "PATCH", "DELETE")
             and "Idempotency-Key" not in headers
         ):
@@ -161,8 +145,7 @@ class RequestBuilder:
 
         for param_union in op.parameters:
             if isinstance(param_union, ParameterRef):
-                s_data = _get_service_data()
-                param: Parameter = s_data.components.parameters[param_union.component_name]
+                param: Parameter = service_data.components.parameters[param_union.component_name]
             else:
                 param = param_union
 

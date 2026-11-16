@@ -72,7 +72,7 @@ def generate_dummy_data(param: Parameter) -> Any:
         "array": [],
         "object": {},
     }
-    return type_defaults.get(param_type, "unknown_type")
+    return type_defaults.get(param_type, "unknown_type") if isinstance(param_type, str) else "unknown_type"
 
 
 def create_sampled_test_cases(service_data: ServiceData) -> list[dict]:

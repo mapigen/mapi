@@ -10,22 +10,33 @@ import msgspec
 class HeadersDict(dict[str, str]):
     """Case-insensitive dictionary for HTTP response headers preserving original casing."""
 
+    __slots__ = ("_lower_map",)
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._lower_map: dict[str, str] = {str(k).lower(): str(v) for k, v in self.items()}
+        self._lower_map: dict[str, str] | None = None
+
+    def _ensure_lower(self) -> dict[str, str]:
+        if self._lower_map is None:
+            self._lower_map = {str(k).lower(): str(v) for k, v in self.items()}
+        return self._lower_map
 
     def __getitem__(self, key: str) -> str:
         k_lower = str(key).lower()
-        if k_lower in self._lower_map:
-            return self._lower_map[k_lower]
+        lower_map = self._ensure_lower()
+        if k_lower in lower_map:
+            return lower_map[k_lower]
         raise KeyError(key)
 
     def get(self, key: str, default: Any = None) -> Any:
         k_lower = str(key).lower()
-        return self._lower_map.get(k_lower, default)
+        return self._ensure_lower().get(k_lower, default)
 
     def __contains__(self, key: object) -> bool:
-        return str(key).lower() in self._lower_map
+        return str(key).lower() in self._ensure_lower()
+
+
+_EMPTY_HEADERS: HeadersDict = HeadersDict()
 
 
 class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):

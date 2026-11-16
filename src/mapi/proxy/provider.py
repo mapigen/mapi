@@ -22,13 +22,20 @@ class ProviderProxy:
         self._provider = provider
 
     def __getattr__(self, api: str) -> ApiProxy:
+        if api.startswith("_"):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{api}'")
         if not self._client._discovery.api_exists(self._provider, api):
             available = self._client._discovery.list_apis(self._provider)
             raise AttributeError(
                 f"API '{api}' not found for provider '{self._provider}'. "
                 f"Available APIs: {available}"
             )
-        return ApiProxy(self._client, self._provider, api)
+        try:
+            info = self._client._discovery.get_api_info(self._provider, api)
+            source = info.sources[0] if info.sources else None
+        except Exception:
+            source = None
+        return ApiProxy(self._client, self._provider, api, source=source)
 
     def __repr__(self) -> str:
         return f"ProviderProxy(provider={self._provider!r})"

@@ -43,7 +43,7 @@ class ApiProxy:
         **kwargs: Any,
     ) -> MapiResult:
         """Execute an API operation synchronously."""
-        source = self._resolve_source()
+        source = self._source if self._source is not None else self._resolve_source()
         return self._client.execute(
             self._provider, self._api, source, operation, _type=_type, _raw=_raw, **kwargs
         )
@@ -57,24 +57,24 @@ class ApiProxy:
         **kwargs: Any,
     ) -> MapiResult:
         """Execute an API operation asynchronously."""
-        source = self._resolve_source()
+        source = self._source if self._source is not None else self._resolve_source()
         return await self._client.aexecute(
             self._provider, self._api, source, operation, _type=_type, _raw=_raw, **kwargs
         )
 
     def to_tool(self, operation: str) -> dict[str, Any]:
         """Export standard JSON Schema / OpenAI function calling definition for an operation."""
-        source = self._resolve_source()
+        source = self._source if self._source is not None else self._resolve_source()
         return self._client.to_tool(self._provider, self._api, operation, source=source)
 
     def paginate(self, operation: str, **kwargs: Any) -> Iterator[MapiResult]:
         """Automatically paginate through results of an operation."""
-        source = self._resolve_source()
+        source = self._source if self._source is not None else self._resolve_source()
         return self._client.paginate(self._provider, self._api, source, operation, **kwargs)
 
     async def apaginate(self, operation: str, **kwargs: Any) -> AsyncIterator[MapiResult]:
         """Asynchronously paginate through results of an operation."""
-        source = self._resolve_source()
+        source = self._source if self._source is not None else self._resolve_source()
         async for page in self._client.apaginate(
             self._provider, self._api, source, operation, **kwargs
         ):
@@ -82,6 +82,8 @@ class ApiProxy:
 
     def __getattr__(self, source_name: str) -> ApiProxy:
         """Return a new ApiProxy scoped to the specified source."""
+        if source_name.startswith("_"):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{source_name}'")
         info = self._client._discovery.get_api_info(self._provider, self._api)
         if source_name not in info.sources:
             raise AttributeError(
