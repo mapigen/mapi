@@ -15,6 +15,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     status: Literal["success", "error"]
     http_status: int | None = None
     network_duration_ms: int | None = None
+    headers: dict[str, str] = msgspec.field(default_factory=dict)
     timestamp: str = ""
     error_type: str | None = None
     error_category: str | None = None

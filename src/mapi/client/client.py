@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn, TypeVar
@@ -22,7 +23,7 @@ from ..exceptions import (
     ValidationError,
 )
 from ..models.config import ClientConfig
-from ..models.request import RequestConfig
+from ..models.request import BatchRequest, RequestConfig
 from ..models.response import MapiResult, ResponseMetadata
 from ..proxy.provider import ProviderProxy
 from ..registry.discovery import DiscoveryService, RegistryManager
@@ -64,6 +65,7 @@ def _build_result(
     data: Any,
     ops_time: float,
     net_time: float,
+    headers: dict[str, str] | None = None,
 ) -> MapiResult:
     """Construct an immutable MapiResult with isolated ops vs network telemetry."""
     return MapiResult(
@@ -73,6 +75,7 @@ def _build_result(
             operation=operation,
             duration_ms=_to_ms(ops_time),
             network_duration_ms=_to_ms(net_time),
+            headers=headers or {},
             status="success",
             http_status=status_code,
             timestamp=_utc_now_iso(),
@@ -147,6 +150,9 @@ class Mapi:
                 pinned_services=cfg.pinned_services,
                 cache_maxsize=cfg.cache_maxsize,
                 log_level=cfg.log_level,
+                multiplexed=cfg.multiplexed,
+                retries=cfg.retries,
+                server_variables=cfg.server_variables,
             )
 
         if isinstance(auth, str):
@@ -163,6 +169,8 @@ class Mapi:
         )
         validator = ParameterValidator(self._cache) if cfg.validate_on_execute else None
         self._builder = RequestBuilder(self._cache, validator)
+        transport_kwargs.setdefault("multiplexed", cfg.multiplexed)
+        transport_kwargs.setdefault("retries", cfg.retries)
         self._transport = transport or NiquestsTransport(**transport_kwargs)
         self._config = cfg
         self._json_decoder = msgspec.json.Decoder()
@@ -195,6 +203,7 @@ class Mapi:
             source,
             operation,
             base_url=self._config.base_url,
+            server_variables=self._config.server_variables,
             timeout=self._config.default_timeout,
             **kwargs,
         )
@@ -260,8 +269,16 @@ class Mapi:
         try:
             response, net_time = _measure(self._transport.request, config, auth=self._auth)
             data, post_time = _measure(self._decode_response, response, target_type, raw)
+            raw_headers = getattr(response, "headers", None)
+            resp_headers = dict(raw_headers) if isinstance(raw_headers, Mapping) else {}
             return _build_result(
-                service_name, operation, response.status_code, data, prep_time + post_time, net_time
+                service_name,
+                operation,
+                response.status_code,
+                data,
+                prep_time + post_time,
+                net_time,
+                headers=resp_headers,
             )
         except (ValidationError, ServiceNotFoundError):
             raise
@@ -289,13 +306,59 @@ class Mapi:
         try:
             response, net_time = await _ameasure(self._transport.arequest(config, auth=self._auth))
             data, post_time = _measure(self._decode_response, response, target_type, raw)
+            raw_headers = getattr(response, "headers", None)
+            resp_headers = dict(raw_headers) if isinstance(raw_headers, Mapping) else {}
             return _build_result(
-                service_name, operation, response.status_code, data, prep_time + post_time, net_time
+                service_name,
+                operation,
+                response.status_code,
+                data,
+                prep_time + post_time,
+                net_time,
+                headers=resp_headers,
             )
         except (ValidationError, ServiceNotFoundError):
             raise
         except Exception as exc:
             _handle_transport_error(exc, service_name, operation)
+
+    async def abatch(
+        self,
+        requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],
+        *,
+        max_concurrency: int = 10,
+        return_exceptions: bool = False,
+    ) -> list[Any]:
+        """
+        Execute multiple API operations concurrently with bounded concurrency.
+
+        Accepts a sequence of BatchRequest instances or (provider, api, operation, kwargs) tuples.
+        """
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _run_single(
+            req: BatchRequest | tuple[str, str, str, dict[str, Any]],
+        ) -> MapiResult:
+            async with semaphore:
+                if isinstance(req, BatchRequest):
+                    source = (
+                        req.source or self._discovery.get_api_info(req.provider, req.api).sources[0]
+                    )
+                    return await self.aexecute(
+                        req.provider,
+                        req.api,
+                        source,
+                        req.operation,
+                        _type=req.type,
+                        _raw=req.raw,
+                        **req.kwargs,
+                    )
+                provider, api, operation, kw = req
+                source = self._discovery.get_api_info(provider, api).sources[0]
+                return await self.aexecute(provider, api, source, operation, **kw)
+
+        tasks = [_run_single(req) for req in requests]
+        return list(await asyncio.gather(*tasks, return_exceptions=return_exceptions))
 
     def clear_cache(self) -> None:
         """Flush the in-memory service definitions cache, typed decoders, and validator structs."""

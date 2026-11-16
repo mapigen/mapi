@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Any
 
@@ -35,6 +36,7 @@ class RequestBuilder:
         operation: str,
         *,
         base_url: str | None = None,
+        server_variables: dict[str, str] | None = None,
         timeout: float = 30.0,
         **kwargs: Any,
     ) -> RequestConfig:
@@ -56,10 +58,30 @@ class RequestBuilder:
                 provider, api, source, operation, kwargs, service_data=service_data, op_details=op
             )
 
-        # 3. Resolve base URL
-        resolved_base_url = base_url or (
-            service_data.servers[0].url if service_data.servers else None
-        )
+        # 3. Resolve base URL and templated server variables
+        if base_url:
+            resolved_base_url = base_url
+        elif service_data.servers:
+            server = service_data.servers[0]
+            url = server.url
+            if "{" in url and "}" in url and server.variables:
+                vars_map: dict[str, str] = {}
+                for var_name, var_def in server.variables.items():
+                    if isinstance(var_def, dict) and "default" in var_def:
+                        vars_map[var_name] = str(var_def["default"])
+                    elif isinstance(var_def, (str, int, float, bool)):
+                        vars_map[var_name] = str(var_def)
+                if server_variables:
+                    vars_map.update(server_variables)
+                for var_name in server.variables:
+                    if var_name in kwargs:
+                        vars_map[var_name] = str(kwargs.pop(var_name))
+                with contextlib.suppress(KeyError):
+                    url = url.format(**vars_map)
+            resolved_base_url = url
+        else:
+            resolved_base_url = None
+
         if not resolved_base_url:
             raise ServiceNotFoundError(
                 f"No server URL configured for '{service_name}'",

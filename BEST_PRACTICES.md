@@ -84,6 +84,33 @@ The `mapi` core architecture is built upon two high-performance libraries. Refer
   client.provider.api("create_item", item=ItemStruct(name="Widget"))
   ```
 
+### 2.5 Strongly-Typed Return Models (`_type=MyStruct`)
+* Callers can direct the SDK to deserialize and validate responses directly into a user-defined `msgspec.Struct` or dataclass at C-speed:
+  ```python
+  class Pokemon(msgspec.Struct):
+      id: int
+      name: str
+
+
+  result = client.pokeapi.REST("pokemon_retrieve", id="ditto", _type=Pokemon)
+  assert isinstance(result.data, Pokemon)
+  ```
+* The client caches typed `msgspec.json.Decoder(target_type)` instances in `self._typed_decoders` to avoid schema re-parsing across repeated calls.
+
+### 2.6 Deferred Parsing via `msgspec.Raw` (`_raw=True`)
+* For large response payloads, proxies, or file-dumping pipelines where full deserialization into Python dictionaries is unnecessary, pass `_raw=True` or `raw=True`:
+  ```python
+  result = client.pokeapi.REST("pokemon_retrieve", id="ditto", _raw=True)
+  assert isinstance(result.data, msgspec.Raw)
+  ```
+* This returns a zero-copy byte view of the response payload without allocating Python heap objects.
+
+### 2.7 Automatic Input Model Conversion
+* When users pass `msgspec.Struct` instances into operation kwargs, `RequestBuilder` automatically converts them via `msgspec.to_builtins(value)`:
+  ```python
+  client.provider.api("create_item", item=ItemStruct(name="Widget"))
+  ```
+
 ---
 
 ## 3. niquests Transport Guidelines

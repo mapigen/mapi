@@ -11,7 +11,7 @@ from .domain import (
     ServiceData,
 )
 from .registry import ApiInfo, MetadataFile, ServiceRegistry
-from .request import RequestConfig
+from .request import BatchRequest, RequestConfig
 from .response import MapiResult, ResponseMetadata
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "ParameterLocation",
     "MetadataFile",
     "ApiInfo",
+    "BatchRequest",
     "ServiceRegistry",
     "ClientConfig",
     "RequestConfig",

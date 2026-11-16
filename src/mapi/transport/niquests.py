@@ -21,7 +21,15 @@ class NiquestsTransport:
     - Context manager support for automatic cleanup.
     """
 
-    def __init__(self, **session_kwargs: Any) -> None:
+    def __init__(
+        self,
+        multiplexed: bool = True,
+        retries: int = 0,
+        **session_kwargs: Any,
+    ) -> None:
+        session_kwargs.setdefault("multiplexed", multiplexed)
+        if retries > 0:
+            session_kwargs.setdefault("retries", retries)
         self._kwargs = session_kwargs
         self._sync_session = niquests.Session(**session_kwargs)
         self._async_session: niquests.AsyncSession | None = None

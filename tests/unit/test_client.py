@@ -7,12 +7,13 @@ import msgspec
 import pytest
 from niquests.exceptions import HTTPError
 
-from mapi import ApiKeyAuth, BearerAuth, Mapi, MapiResult
+from mapi import ApiKeyAuth, BatchRequest, BearerAuth, Mapi, MapiResult
 from mapi.exceptions import (
     ClientError,
     RateLimitError,
     ServerError,
 )
+from mapi.models import Server
 from mapi.models.config import ClientConfig
 from mapi.models.request import RequestConfig
 from mapi.proxy.api import ApiProxy
@@ -46,6 +47,8 @@ def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
     transport = MagicMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 200
+    mock_resp.headers = {"Content-Type": "application/json", "X-RateLimit-Remaining": "4999"}
+    mock_resp.content = b'{"id": 1, "name": "pikachu"}'
     mock_resp.json.return_value = {"id": 1, "name": "pikachu"}
     transport.request.return_value = mock_resp
     transport.arequest = AsyncMock(return_value=mock_resp)
@@ -225,3 +228,62 @@ class TestMapiContextManager:
         client = _build_test_mapi(sample_service_data, sample_registry)
         client.clear_cache()
         cast(MagicMock, client._cache.clear).assert_called_once()
+
+    def test_response_headers_captured(self, sample_service_data, sample_registry):
+        client = _build_test_mapi(sample_service_data, sample_registry)
+        result = client.pokeapi.REST("get_pokemon", id="pikachu")
+        assert result.metadata.headers.get("X-RateLimit-Remaining") == "4999"
+        assert result.metadata.headers.get("Content-Type") == "application/json"
+
+    @pytest.mark.asyncio
+    async def test_abatch_execution(self, sample_service_data, sample_registry):
+        client = _build_test_mapi(sample_service_data, sample_registry)
+        requests = [
+            BatchRequest(
+                provider="pokeapi", api="REST", operation="get_pokemon", kwargs={"id": "ditto"}
+            ),
+            ("pokeapi", "REST", "get_pokemon", {"id": "pikachu"}),
+        ]
+        results = await client.abatch(requests, max_concurrency=2)
+        assert len(results) == 2
+        assert all(isinstance(r, MapiResult) for r in results)
+
+    def test_templated_server_url_resolution(self, sample_service_data):
+        from mapi.client.request_builder import RequestBuilder
+
+        sample_service_data = msgspec.structs.replace(
+            sample_service_data,
+            servers=[
+                Server(
+                    url="https://{subdomain}.example.com:{port}/{version}",
+                    variables={
+                        "subdomain": {"default": "api"},
+                        "port": {"default": "443"},
+                        "version": {"default": "v1"},
+                    },
+                )
+            ],
+        )
+        cache = MagicMock()
+        cache.get.return_value = sample_service_data
+        builder = RequestBuilder(cache)
+
+        config = builder.build("mock_service", "REST", "openapi", "get_user", user_id=123)
+        assert config.url == "https://api.example.com:443/v1/users/123"
+
+        config2 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=123,
+            subdomain="sandbox",
+            port="8443",
+        )
+        assert config2.url == "https://sandbox.example.com:8443/v1/users/123"
+
+    def test_client_config_multiplexed_defaults(self):
+        cfg = ClientConfig()
+        assert cfg.multiplexed is True
+        assert cfg.retries == 0
+        assert cfg.server_variables == {}

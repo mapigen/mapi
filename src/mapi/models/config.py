@@ -6,7 +6,7 @@ import os
 import msgspec
 
 
-class ClientConfig(msgspec.Struct, frozen=True):
+class ClientConfig(msgspec.Struct, frozen=True, gc=False):
     """Immutable client configuration."""
 
     base_url: str | None = None
@@ -15,6 +15,9 @@ class ClientConfig(msgspec.Struct, frozen=True):
     pinned_services: tuple[str, ...] = ()
     cache_maxsize: int = 64
     log_level: str = "INFO"
+    multiplexed: bool = True
+    retries: int = 0
+    server_variables: dict[str, str] = msgspec.field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> ClientConfig:

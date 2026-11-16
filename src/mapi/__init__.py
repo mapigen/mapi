@@ -12,22 +12,26 @@ from .exceptions import (
     TransportError,
     ValidationError,
 )
+from .models.config import ClientConfig
+from .models.request import BatchRequest
 from .models.response import MapiResult, ResponseMetadata
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "Mapi",
-    "MapiResult",
-    "ResponseMetadata",
     "ApiKeyAuth",
+    "BatchRequest",
     "BearerAuth",
-    "MapiError",
-    "ConfigurationError",
-    "ServiceNotFoundError",
-    "ValidationError",
-    "TransportError",
-    "RateLimitError",
-    "ServerError",
+    "ClientConfig",
     "ClientError",
+    "ConfigurationError",
+    "Mapi",
+    "MapiError",
+    "MapiResult",
+    "RateLimitError",
+    "ResponseMetadata",
+    "ServerError",
+    "ServiceNotFoundError",
+    "TransportError",
+    "ValidationError",
 ]
