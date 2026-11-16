@@ -9,12 +9,14 @@ from .exceptions import (
     RateLimitError,
     ServerError,
     ServiceNotFoundError,
+    SpecUpdateAvailableWarning,
     TransportError,
     ValidationError,
 )
 from .models.config import ClientConfig
-from .models.request import BatchRequest
+from .models.request import BatchRequest, RequestConfig
 from .models.response import HeadersDict, MapiResult, ResponseMetadata
+from .models.spec import SpecDiffResult
 
 __version__ = "0.1.0"
 
@@ -30,9 +32,12 @@ __all__ = [
     "MapiError",
     "MapiResult",
     "RateLimitError",
+    "RequestConfig",
     "ResponseMetadata",
     "ServerError",
     "ServiceNotFoundError",
+    "SpecDiffResult",
+    "SpecUpdateAvailableWarning",
     "TransportError",
     "ValidationError",
 ]

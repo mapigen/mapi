@@ -8,8 +8,9 @@ import msgspec
 import zstandard as zstd
 
 from ..exceptions import ConfigurationError, ServiceNotFoundError
-from ..models.domain import ServiceData
+from ..models.domain import Operation, ServiceData
 from ..models.registry import ServiceRegistry
+from .packfile import PackfileLoader
 
 log = logging.getLogger(__name__)
 
@@ -40,9 +41,17 @@ class DiskLoader:
         self,
         data_dir: Path | None = None,
         registry_path: Path | None = None,
+        packfile_path: Path | None = None,
     ) -> None:
         self.data_dir = data_dir or _default_data_dir()
         self.registry_path = registry_path or _default_registry_path()
+        self.packfile_path = packfile_path
+        self._packfile: PackfileLoader | None = None
+        if self.packfile_path is not None and self.packfile_path.exists():
+            self._packfile = PackfileLoader(self.packfile_path)
+        elif self.registry_path.suffix == ".db" and self.registry_path.exists():
+            self._packfile = PackfileLoader(self.registry_path)
+
         self._dctx = zstd.ZstdDecompressor()
         self._service_decoder = msgspec.json.Decoder(ServiceData)
         self._service_msgpack_decoder = msgspec.msgpack.Decoder(ServiceData)
@@ -51,6 +60,9 @@ class DiskLoader:
 
     def load_registry(self) -> ServiceRegistry:
         """Load and decode services.json into a typed ServiceRegistry."""
+        if self._packfile is not None:
+            return self._packfile.load_registry()
+
         if not self.registry_path.exists():
             raise ConfigurationError(
                 f"Service registry not found at {self.registry_path}. "
@@ -61,6 +73,9 @@ class DiskLoader:
 
     def load_service(self, provider: str, api: str, source: str) -> ServiceData:
         """Load utilize.json, utilize.msgpack, or .zst for a service."""
+        if self._packfile is not None:
+            return self._packfile.load_service(provider, api, source)
+
         key = (provider, api, source)
         if key in self._path_cache:
             path, is_compressed, is_msgpack = self._path_cache[key]
@@ -97,6 +112,14 @@ class DiskLoader:
             f"Service data for '{provider}/{api}/{source}' not found. Expected at {service_dir}",
             service=f"{provider}/{api}/{source}",
         )
+
+    def load_operation(
+        self, provider: str, api: str, source: str, operation_id: str
+    ) -> Operation | None:
+        """Load single operation from packfile if available, otherwise return None."""
+        if self._packfile is not None:
+            return self._packfile.load_operation(provider, api, source, operation_id)
+        return None
 
     def clear_cache(self) -> None:
         """Clear resolved service path cache."""

@@ -34,7 +34,7 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     service: str
     operation: str
     duration_ms: int
-    status: Literal["success", "error"]
+    status: Literal["success", "error", "dry_run"]
     http_status: int | None = None
     network_duration_ms: int | None = None
     headers: dict[str, str] = msgspec.field(default_factory=dict)

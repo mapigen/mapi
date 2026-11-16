@@ -238,6 +238,7 @@ from pathlib import Path
 from mapi import Mapi
 from mapi.models.config import ClientConfig
 
+
 @dataclass
 class CliContext:
     data_dir: Path | None
@@ -247,7 +248,7 @@ class CliContext:
     _client: Mapi | None = None
 
     @property
-    def client(self) -> Mapi:      # lazy: --help and completion stay instant
+    def client(self) -> Mapi:  # lazy: --help and completion stay instant
         if self._client is None:
             cfg = ClientConfig(base_url=self.base_url, default_timeout=self.timeout)
             self._client = Mapi(config=cfg, data_dir=self.data_dir)
@@ -342,10 +343,11 @@ Rules:
 from rich.console import Console
 from mapi_cli.ui.theme import build_theme
 
+
 def make_consoles(color: str, theme: str):
-    force = {"always": True, "never": False}.get(color)   # None = auto
+    force = {"always": True, "never": False}.get(color)  # None = auto
     kw = dict(theme=build_theme(theme), force_terminal=force, no_color=(color == "never"))
-    return Console(**kw), Console(stderr=True, **kw)      # out, err
+    return Console(**kw), Console(stderr=True, **kw)  # out, err
 ```
 
 ### 6.3 Rendering recipes
@@ -406,10 +408,11 @@ Mechanics:
 # mapi_cli/completion.py  (sketch)
 def complete_provider(ctx: typer.Context, incomplete: str):
     try:
-        idx = load_index(ctx)                      # cached names-only index
+        idx = load_index(ctx)  # cached names-only index
         return [(p, f"{n} APIs") for p, n in idx.providers() if p.startswith(incomplete)]
     except Exception:
-        return []                                  # completion must never break the shell
+        return []  # completion must never break the shell
+
 
 def complete_operation(ctx: typer.Context, incomplete: str):
     try:

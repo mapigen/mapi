@@ -35,7 +35,11 @@ class NiquestsTransport:
         self._async_session: niquests.AsyncSession | None = None
 
     @staticmethod
-    def _prepare_kwargs(config: RequestConfig, auth: AuthBase | None = None) -> dict[str, Any]:
+    def _prepare_kwargs(
+        config: RequestConfig,
+        auth: AuthBase | None = None,
+        stream: bool = False,
+    ) -> dict[str, Any]:
         kw: dict[str, Any] = {"timeout": config.timeout}
         if config.params:
             kw["params"] = config.params
@@ -45,13 +49,20 @@ class NiquestsTransport:
             kw["json"] = config.json_body
         if auth is not None:
             kw["auth"] = auth
+        if stream:
+            kw["stream"] = True
         return kw
 
     # --- Sync ---
 
-    def request(self, config: RequestConfig, auth: AuthBase | None = None) -> Response:
+    def request(
+        self,
+        config: RequestConfig,
+        auth: AuthBase | None = None,
+        stream: bool = False,
+    ) -> Response:
         log.debug("sync %s %s", config.method, config.url)
-        kw = self._prepare_kwargs(config, auth)
+        kw = self._prepare_kwargs(config, auth, stream=stream)
         response: Response = self._sync_session.request(config.method, config.url, **kw)
         response.raise_for_status()
         return response
@@ -61,11 +72,16 @@ class NiquestsTransport:
 
     # --- Async ---
 
-    async def arequest(self, config: RequestConfig, auth: AuthBase | None = None) -> Response:
+    async def arequest(
+        self,
+        config: RequestConfig,
+        auth: AuthBase | None = None,
+        stream: bool = False,
+    ) -> Response:
         log.debug("async %s %s", config.method, config.url)
         if self._async_session is None:
             self._async_session = niquests.AsyncSession(**self._kwargs)
-        kw = self._prepare_kwargs(config, auth)
+        kw = self._prepare_kwargs(config, auth, stream=stream)
         response: Response = await self._async_session.request(config.method, config.url, **kw)
         response.raise_for_status()
         return response

@@ -229,3 +229,75 @@ class ClientConfig(msgspec.Struct, frozen=True, gc=False):
 | `ServiceCache.get` | $O(1)$ amortized | $O(S)$ | Native 3-tuple hash lookup; fast-path for pinned services. |
 | `ParameterValidator.validate` | $O(P)$ | $O(1)$ | Uses compiled C Structs cached per operation. |
 | `execute` / `aexecute` | $O(P + R)$ | $O(R)$ | Parameter preparation + direct C decoding via `msgspec`. |
+
+---
+
+## 6. Advanced Developer & Agent Operations
+
+### 6.1 Dry-Run Execution & cURL Export
+Generate executable, copy-pasteable `curl` commands or validate parameter resolution without firing HTTP requests:
+```python
+result = client.pokeapi.REST("pokemon_retrieve", id="ditto", _dry_run=True)
+config: RequestConfig = result.data
+
+print(config.to_curl())
+# curl -X GET 'https://pokeapi.co/api/v2/pokemon/ditto' \
+#      -H 'User-Agent: mapi/0.1.0' \
+#      -H 'Accept: application/json'
+```
+
+### 6.2 Automatic Idempotency
+Protect against duplicate mutations on retries by injecting unique UUID v4 idempotency keys:
+```python
+client.stripe.REST("charges_create", amount=2000, currency="usd", _idempotent=True)
+# Injects 'Idempotency-Key: <uuid4>' into headers for POST/PUT/PATCH/DELETE
+```
+
+### 6.3 LLM Tool Calling (OpenAI / Anthropic / Gemini Schema)
+Export JSON Schema function calling definitions directly from operation metadata:
+```python
+# 1. Export schema for AI Agent
+tool_def = client.pokeapi.REST.to_tool("pokemon_retrieve")
+# {"type": "function", "function": {"name": "pokeapi_REST_pokemon_retrieve", ...}}
+
+# 2. Dispatch LLM function call arguments
+result = client.call_tool("pokeapi_REST_pokemon_retrieve", id="pikachu")
+```
+
+### 6.4 Dynamic Runtime Spec Ingestion & In-Place Updates
+Register, validate diffs, and update OpenAPI specs at runtime with optional auto-inferred providers:
+```python
+# Ingest spec with auto-inferred provider from server URL / title
+provider = client.register_spec("https://api.acme.com/v1/openapi.json")
+
+# Check for upstream changes (emits SpecUpdateAvailableWarning on diff)
+diff: SpecDiffResult = client.check_spec_diff("acme")
+if diff.has_diff:
+    print(f"Added operations: {diff.added_operations}")
+    client.update_spec("acme", force=True)
+```
+
+### 6.5 Auto-Pagination
+Iterate seamlessly across cursor, numeric, offset, or RFC 5988 `Link` header paginated APIs:
+```python
+# Sync pagination
+for page in client.stripe.REST.paginate("charges_list", limit=100):
+    print(page.data)
+
+# Async pagination
+async for page in client.stripe.REST.apaginate("charges_list", limit=100):
+    print(page.data)
+```
+
+### 6.6 SQLite Packfile & Granular Operation Storage
+In production, compile loose specifications into a single bundled SQLite B-Tree packfile (`services.db`) for microsecond point lookups and minimal memory footprint:
+```python
+from mapi.registry.packfile import PackfileLoader, PackfileStorage
+
+# Compile into packfile
+PackfileStorage.create_packfile("services.db", registry, services_data)
+
+# Read from packfile
+with PackfileLoader("services.db") as loader:
+    op = loader.load_operation("stripe", "REST", "github", "charges_create")
+```

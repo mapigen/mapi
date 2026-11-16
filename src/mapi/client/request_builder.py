@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import Any
+import uuid
+from typing import TYPE_CHECKING, Any
 
 import msgspec
 
@@ -11,6 +12,9 @@ from ..exceptions import ServiceNotFoundError
 from ..models.domain import Parameter, ParameterRef
 from ..models.request import RequestConfig
 from ..validation.param_validator import ParameterValidator
+
+if TYPE_CHECKING:
+    from ..cache.hot_cache import HotOpCache
 
 log = logging.getLogger(__name__)
 
@@ -24,9 +28,11 @@ class RequestBuilder:
         self,
         cache: ServiceCache,
         validator: ParameterValidator | None = None,
+        hot_cache: HotOpCache | None = None,
     ) -> None:
         self._cache = cache
         self._validator = validator
+        self._hot_cache = hot_cache
 
     def build(
         self,
@@ -40,20 +46,27 @@ class RequestBuilder:
         default_headers: dict[str, str] | None = None,
         server_pattern: str | None = None,
         server_tag: str | None = None,
+        idempotent: bool = False,
         timeout: float = 30.0,
         **kwargs: Any,
     ) -> RequestConfig:
         service_name = f"{provider}/{api}/{source}"
+        cache_key = (provider, api, source, operation)
 
-        # 1. Retrieve service definition (cached in memory)
+        # 1. Retrieve operation (check HotOpCache first)
+        op = self._hot_cache.get(cache_key) if self._hot_cache is not None else None
         service_data = self._cache.get(provider, api, source)
-        op = service_data.operations.get(operation)
+
         if op is None:
-            raise ServiceNotFoundError(
-                f"Operation '{operation}' not found in '{service_name}'",
-                service=service_name,
-                operation=operation,
-            )
+            op = service_data.operations.get(operation)
+            if op is None:
+                raise ServiceNotFoundError(
+                    f"Operation '{operation}' not found in '{service_name}'",
+                    service=service_name,
+                    operation=operation,
+                )
+            if self._hot_cache is not None:
+                self._hot_cache.put(cache_key, op)
 
         # 2. Parameter schema validation
         if self._validator is not None:
@@ -116,6 +129,16 @@ class RequestBuilder:
         }
         if default_headers:
             headers.update(default_headers)
+
+        effective_idempotent = (
+            idempotent or kwargs.pop("_idempotent", False) or kwargs.pop("idempotent", False)
+        )
+        if (
+            effective_idempotent
+            and op.method in ("POST", "PUT", "PATCH", "DELETE")
+            and "Idempotency-Key" not in headers
+        ):
+            headers["Idempotency-Key"] = str(uuid.uuid4())
 
         for param_union in op.parameters:
             if isinstance(param_union, ParameterRef):

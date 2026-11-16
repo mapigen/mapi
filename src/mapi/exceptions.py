@@ -57,3 +57,7 @@ class ServerError(TransportError):
 
 class ClientError(TransportError):
     """Raised on HTTP 4xx Client Error (non-429)."""
+
+
+class SpecUpdateAvailableWarning(UserWarning):
+    """Emitted when an upstream specification update or diff is detected."""

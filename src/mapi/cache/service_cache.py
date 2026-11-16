@@ -47,6 +47,21 @@ class ServiceCache:
                     return self._pinned[key]
         return self._lru_load(provider, api, source)
 
+    def put(
+        self,
+        provider: str,
+        api: str,
+        source: str,
+        data: ServiceData,
+        pinned: bool = True,
+    ) -> None:
+        """Store or update a ServiceData instance in cache."""
+        key = f"{provider}:{api}:{source}"
+        with self._lock:
+            self._pinned[key] = data
+            if pinned and key not in self._pinned_keys:
+                self._pinned_keys = self._pinned_keys | {key}
+
     def clear(self) -> None:
         """Evict all cached entries."""
         with self._lock:
