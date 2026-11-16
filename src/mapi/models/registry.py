@@ -19,7 +19,7 @@ class MetadataFile(msgspec.Struct, frozen=True, gc=False):
 
 
 class ApiInfo(msgspec.Struct, frozen=True, gc=False):
-    """Metadata for a single API as stored in services.json."""
+    """Metadata for a single API as stored in mapi-registry.json."""
 
     sources: list[str]
     operation_count: int
@@ -29,7 +29,7 @@ class ApiInfo(msgspec.Struct, frozen=True, gc=False):
 
 
 class ServiceRegistry(msgspec.Struct, frozen=True, gc=False):
-    """Root object of services.json."""
+    """Root object of mapi-registry.json."""
 
     version: NonEmptyStr
     generated_at: str

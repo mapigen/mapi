@@ -20,9 +20,9 @@ def mock_sdk_environment(
 ):
     """Sets up a complete real filesystem environment for integration testing."""
     data_dir = tmp_path / "data"
-    registry_path = tmp_path / "services.json"
+    registry_path = tmp_path / "mapi-registry.json"
 
-    # Write services.json
+    # Write mapi-registry.json
     registry_path.write_bytes(msgspec.json.encode(sample_registry))
 
     # Write pokeapi/openapi/REST/REST.utilize.json

@@ -17,7 +17,7 @@ The `mapi.Mapi` class is the primary entry point for all operations.
 ```python
 from mapi import Mapi, ClientConfig, BearerAuth
 
-# Default initialization (reads services.json from bundled registry)
+# Default initialization (reads mapi-registry.json from bundled registry)
 client = Mapi()
 
 # Custom configuration with Bearer token
@@ -33,7 +33,7 @@ client = Mapi(
 * **`auth`** (`Optional[Union[AuthBase, str]]`): An authentication object (`BearerAuth`, `ApiKeyAuth`) or raw token string (automatically wrapped in `BearerAuth`).
 * **`transport`** (`Optional[NiquestsTransport]`): Custom HTTP transport (defaults to a managed `NiquestsTransport` instance).
 * **`data_dir`** (`Optional[Path]`): Override path for service definitions (`utilize.json.zst`).
-* **`registry_path`** (`Optional[Path]`): Override path for `services.json`.
+* **`registry_path`** (`Optional[Path]`): Override path for `mapi-registry.json`.
 * **`base_url`** (`Optional[str]`): Override default server URL declared in OpenAPI specifications.
 * **`**transport_kwargs`**: Arbitrary arguments forwarded to underlying `niquests.Session` / `AsyncSession` (e.g., `verify=False`).
 

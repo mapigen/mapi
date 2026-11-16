@@ -38,6 +38,14 @@ class TestDiskLoader:
             loader.load_registry()
 
     def test_load_valid_registry(self, tmp_path, sample_registry):
+        reg_file = tmp_path / "mapi-registry.json"
+        reg_file.write_bytes(msgspec.json.encode(sample_registry))
+        loader = DiskLoader(data_dir=tmp_path, registry_path=reg_file)
+        reg = loader.load_registry()
+        assert "pokeapi" in reg.providers
+        assert reg.version == "1.0"
+
+    def test_load_fallback_services_json(self, tmp_path, sample_registry):
         reg_file = tmp_path / "services.json"
         reg_file.write_bytes(msgspec.json.encode(sample_registry))
         loader = DiskLoader(data_dir=tmp_path, registry_path=reg_file)

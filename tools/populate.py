@@ -26,7 +26,7 @@ DATA_DIR = SRC_DIR / "data"
 REGISTRY_DIR = ROOT_DIR / "registry"
 OVERRIDES_PATH = REGISTRY_DIR / "overrides.json"
 POPULARITY_PATH = REGISTRY_DIR / "popularity.json"
-SERVICES_JSON_PATH = SRC_DIR / "services.json"
+SERVICES_JSON_PATH = SRC_DIR / "mapi-registry.json"
 
 
 def get_rank(service: str) -> int:

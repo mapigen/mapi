@@ -16,7 +16,8 @@ log = logging.getLogger(__name__)
 
 _PACKAGE_DIR = Path(__file__).resolve().parent.parent
 _DEFAULT_DATA_DIR = _PACKAGE_DIR / "data"
-_DEFAULT_REGISTRY = _PACKAGE_DIR / "services.json"
+_PRIMARY_REGISTRY = _PACKAGE_DIR / "mapi-registry.json"
+_LEGACY_REGISTRY = _PACKAGE_DIR / "services.json"
 
 
 def _default_data_dir() -> Path:
@@ -26,7 +27,13 @@ def _default_data_dir() -> Path:
 
 def _default_registry_path() -> Path:
     env = os.environ.get("MAPI_REGISTRY_PATH")
-    return Path(env) if env else _DEFAULT_REGISTRY
+    if env:
+        return Path(env)
+    if _PRIMARY_REGISTRY.exists():
+        return _PRIMARY_REGISTRY
+    if _LEGACY_REGISTRY.exists():
+        return _LEGACY_REGISTRY
+    return _PRIMARY_REGISTRY
 
 
 class DiskLoader:
@@ -59,7 +66,7 @@ class DiskLoader:
         self._path_cache: dict[tuple[str, str, str], tuple[Path, bool, bool]] = {}
 
     def load_registry(self) -> ServiceRegistry:
-        """Load and decode services.json into a typed ServiceRegistry."""
+        """Load and decode mapi-registry.json (or fallback services.json) into a typed ServiceRegistry."""
         if self._packfile is not None:
             return self._packfile.load_registry()
 

@@ -16,7 +16,12 @@ log = logging.getLogger("mapi.tools.validate")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = ROOT_DIR / "src" / "mapi" / "data"
-DEFAULT_REGISTRY_PATH = ROOT_DIR / "src" / "mapi" / "services.json"
+_PRIMARY_REGISTRY = ROOT_DIR / "src" / "mapi" / "mapi-registry.json"
+DEFAULT_REGISTRY_PATH = (
+    _PRIMARY_REGISTRY
+    if _PRIMARY_REGISTRY.exists()
+    else ROOT_DIR / "src" / "mapi" / "services.json"
+)
 
 
 def validate_operations_and_refs(data: ServiceData, service_name: str) -> list[str]:

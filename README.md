@@ -160,7 +160,7 @@ While `mapi` comes with bundled API data, you can easily add custom API specific
     ```
 2.  **Point the client to your data:** Specify custom directories when instantiating `Mapi` or via environment variables:
     ```python
-    client = Mapi(data_dir="/path/to/data", registry_path="/path/to/services.json")
+    client = Mapi(data_dir="/path/to/data", registry_path="/path/to/mapi-registry.json")
     ```
     Or set `MAPI_DATA_DIR` and `MAPI_REGISTRY_PATH` environment variables.
 
