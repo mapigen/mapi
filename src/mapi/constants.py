@@ -1,5 +1,4 @@
-# src/mapi/constants.py
-"""Centralized constants for the mapi SDK following clean software engineering standards."""
+"""Constants used across the mapi SDK."""
 
 from __future__ import annotations
 

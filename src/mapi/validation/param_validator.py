@@ -31,13 +31,7 @@ def _openapi_to_python(schema: dict[str, Any]) -> Any:
 
 
 class ParameterValidator:
-    """
-    Validates call kwargs against an operation's declared OpenAPI parameter schema.
-
-    Uses msgspec.defstruct to synthesize an operation-specific typed Struct,
-    caches compiled Struct types per operation, and executes zero-copy schema
-    validation with msgspec.convert.
-    """
+    """Validates call kwargs against an operation's declared OpenAPI parameter schema."""
 
     def __init__(self, cache: ServiceCache) -> None:
         self._cache = cache

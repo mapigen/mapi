@@ -20,9 +20,7 @@ log = logging.getLogger("mapi")
 
 
 class DynamicSpecService:
-    """
-    Manages dynamic runtime OpenAPI ingestion, diff checking, and safe atomic updates.
-    """
+    """Manages OpenAPI ingestion, diff checking, and spec updates."""
 
     def __init__(self, client: Mapi) -> None:
         self._client = client
@@ -150,9 +148,7 @@ class DynamicSpecService:
         source: str = "dynamic",
         force: bool = False,
     ) -> bool:
-        """
-        Atomically update an existing spec in-place with zero downtime for readers.
-        """
+        """Update an existing spec in the client cache."""
         target_source = spec_source
         if target_source is None:
             target_source = self._registered_specs.get((provider, api))

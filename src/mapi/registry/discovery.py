@@ -16,10 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class RegistryManager:
-    """
-    Thread-safe lazy loader for ServiceRegistry.
-    Double-checked locking ensures single load even under concurrent access.
-    """
+    """Thread-safe lazy loader for ServiceRegistry."""
 
     def __init__(self, loader: DiskLoader) -> None:
         self._loader = loader
@@ -41,12 +38,7 @@ class RegistryManager:
 
 
 class DiscoveryService:
-    """
-    Provider/API/operation discovery service.
-
-    Replaces mapigen's DiscoveryClient (which used static methods and module-level
-    lru_cache) with an injectable, testable service.
-    """
+    """Provider, API, and operation discovery service."""
 
     def __init__(
         self,

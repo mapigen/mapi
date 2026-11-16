@@ -32,7 +32,7 @@ log = logging.getLogger("mapi")
 
 class Mapi:
     """
-    Universal API client. Factory and composition root.
+    Universal API client.
 
     Synchronous usage:
         client = Mapi()

@@ -43,12 +43,7 @@ def _default_registry_path() -> Path:
 
 
 class DiskLoader:
-    """
-    Single abstraction over all filesystem access for mapi service data.
-
-    Directory layout:
-      data_dir / provider / source / api / {api}.mapi.json[.zst]
-    """
+    """Loads service definitions and registry metadata from disk."""
 
     def __init__(
         self,

@@ -12,10 +12,7 @@ if TYPE_CHECKING:
 
 
 class ToolService:
-    """
-    Manages LLM / AI function calling definitions and tool invocations.
-    Converts native Operation metadata into OpenAI, Anthropic, and Gemini compatible schemas.
-    """
+    """Converts Operation metadata into LLM function calling definitions."""
 
     def __init__(self, client: Mapi) -> None:
         self._client = client
@@ -27,7 +24,7 @@ class ToolService:
         operation: str,
         source: str | None = None,
     ) -> dict[str, Any]:
-        """Export standard JSON Schema / OpenAI function calling definition for an operation."""
+        """Export JSON Schema function calling definition for an operation."""
         src = source or self._client._discovery.get_api_info(provider, api).sources[0]
         service_data = self._client._cache.get(provider, api, src)
         op = service_data.operations.get(operation)

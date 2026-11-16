@@ -18,12 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class PackfileLoader:
-    """
-    High-performance, zero-dependency SQLite B-Tree packfile loader.
-
-    Provides microsecond point lookups for both service metadata and
-    granular single-operation payloads.
-    """
+    """SQLite packfile loader for service metadata and operations."""
 
     def __init__(self, db_path: Path | str) -> None:
         self.db_path = Path(db_path)
@@ -76,7 +71,7 @@ class PackfileLoader:
     def load_operation(
         self, provider: str, api: str, source: str, operation_id: str
     ) -> Operation | None:
-        """Granular microsecond point lookup for a single Operation."""
+        """Load a single operation by ID from packfile."""
         cursor = self._conn.cursor()
         key = f"op:{provider}:{api}:{source}:{operation_id}"
         cursor.execute("SELECT payload FROM registry_entries WHERE key = ?;", (key,))

@@ -78,7 +78,7 @@ def _build_result(
     headers: dict[str, str] | None = None,
     status: Any = STATUS_SUCCESS,
 ) -> MapiResult:
-    """Construct an immutable MapiResult with isolated ops vs network telemetry."""
+    """Construct MapiResult with timing metadata."""
     return MapiResult(
         data=data,
         metadata=ResponseMetadata(
@@ -128,7 +128,7 @@ def _extract_call_flags(
     _idempotent: bool,
     _stream: bool,
 ) -> tuple[Any, bool, bool, bool, bool]:
-    """Efficiently extract special control flags from kwargs with minimal pop overhead."""
+    """Extract control flags from kwargs."""
     target_type = _type
     raw = _raw
     dry_run = _dry_run
@@ -165,7 +165,7 @@ def _extract_call_flags(
 
 
 def _extract_response_headers(response: Any) -> HeadersDict:
-    """Extract and wrap response headers efficiently, avoiding MagicMock attribute thrashing."""
+    """Extract and wrap response headers into HeadersDict."""
     resp_dict = getattr(response, "__dict__", None)
     raw = resp_dict.get("headers") if resp_dict is not None else getattr(response, "headers", None)
 
@@ -179,11 +179,7 @@ def _extract_response_headers(response: Any) -> HeadersDict:
 
 
 class RequestExecutor:
-    """
-    Core HTTP request execution pipeline for sync, async, and batch calls.
-    Encapsulates parameter resolution, wire dispatch, response body decoding,
-    and structured error mapping.
-    """
+    """HTTP request execution pipeline for sync, async, and batch calls."""
 
     def __init__(self, client: Mapi) -> None:
         self._client = client
@@ -229,7 +225,7 @@ class RequestExecutor:
         target_type: Any = None,
         raw: bool = False,
     ) -> Any:
-        """Decode response body directly with msgspec C decoder, falling back to response.json()."""
+        """Decode response body using msgspec or response.json()."""
         content = getattr(response, "content", None)
         if raw:
             return (
@@ -403,10 +399,7 @@ class RequestExecutor:
         *,
         return_exceptions: bool = False,
     ) -> list[Any]:
-        """
-        Execute multiple API operations synchronously in a sequential loop.
-        Provides a convenient batching interface without concurrency overhead.
-        """
+        """Execute multiple API operations synchronously in a sequential loop."""
         results: list[Any] = []
         for req in requests:
             try:

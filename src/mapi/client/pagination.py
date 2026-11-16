@@ -23,10 +23,7 @@ if TYPE_CHECKING:
 
 
 class PaginationService:
-    """
-    Automated pagination traversal engine supporting cursor-based,
-    numeric page, offset-based, and RFC 5988 Link header pagination strategies.
-    """
+    """Handles cursor, page, offset, and Link header pagination."""
 
     def __init__(self, client: Mapi) -> None:
         self._client = client

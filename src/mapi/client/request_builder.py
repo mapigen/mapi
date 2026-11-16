@@ -31,9 +31,7 @@ log = logging.getLogger(__name__)
 
 
 class RequestBuilder:
-    """
-    Constructs an immutable RequestConfig from operation metadata and call kwargs.
-    """
+    """Constructs RequestConfig from operation metadata and kwargs."""
 
     def __init__(
         self,
