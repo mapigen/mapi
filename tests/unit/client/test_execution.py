@@ -12,7 +12,7 @@ from niquests.exceptions import HTTPError
 from mapi import BatchRequest, Mapi, MapiResult
 from mapi.cache.hot_cache import HotOpCache
 from mapi.client.request_builder import RequestBuilder
-from mapi.exceptions import ClientError, RateLimitError, ServerError
+from mapi.exceptions import ClientError, RateLimitError, ServerError, TransportError
 from mapi.models.domain import Components, Operation, Parameter, Server, ServiceData
 from mapi.models.request import RequestConfig
 from tests.unit.client.conftest import build_test_mapi
@@ -234,3 +234,44 @@ class TestDryRunAndErgonomics:
         assert res.data is not None
         chunks = list(res.data)
         assert len(chunks) == 2
+
+    def test_sync_batch_sequential(self, sample_service_data, sample_registry):
+        client = build_test_mapi(sample_service_data, sample_registry)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"name": "ditto"}'
+        mock_resp.json.return_value = {"name": "ditto"}
+        cast(MagicMock, client._transport.request).return_value = mock_resp
+
+        requests = [
+            ("pokeapi", "REST", "get_pokemon", {"id": "ditto"}),
+            BatchRequest(provider="pokeapi", api="REST", operation="get_pokemon", kwargs={"id": "ditto"}),
+        ]
+        results = client.batch(requests)
+        assert len(results) == 2
+        assert results[0].data == {"name": "ditto"}
+        assert results[1].data == {"name": "ditto"}
+
+    def test_sync_batch_return_exceptions(self, sample_service_data, sample_registry):
+        client = build_test_mapi(sample_service_data, sample_registry)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"name": "ditto"}'
+        mock_resp.json.return_value = {"name": "ditto"}
+        cast(MagicMock, client._transport.request).side_effect = [mock_resp, HTTPError("Fail")]
+
+        requests = [
+            ("pokeapi", "REST", "get_pokemon", {"id": "ditto"}),
+            ("pokeapi", "REST", "get_pokemon", {"id": "fail"}),
+        ]
+        # With return_exceptions=True
+        results = client.batch(requests, return_exceptions=True)
+        assert len(results) == 2
+        assert results[0].data == {"name": "ditto"}
+        assert isinstance(results[1], Exception)
+
+        # Reset side effect
+        cast(MagicMock, client._transport.request).side_effect = [mock_resp, HTTPError("Fail")]
+        # With return_exceptions=False, raises
+        with pytest.raises(TransportError):
+            client.batch(requests, return_exceptions=False)

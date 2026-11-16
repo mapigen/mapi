@@ -6,6 +6,8 @@ from typing import Any
 
 import msgspec
 
+from mapi.constants import MAPI_EXT_JSON
+
 from .utils import VALID_METHODS, get_params_from_operation
 
 
@@ -107,6 +109,6 @@ def extract_operations_and_components(service: str, spec: dict[str, Any]) -> dic
 def save_metadata(service: str, data: dict[str, Any], out_dir: Path) -> Path:
     """Save extracted metadata into a mapi.json file."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{service}.mapi.json"
+    path = out_dir / f"{service}{MAPI_EXT_JSON}"
     path.write_bytes(msgspec.json.encode(data))
     return path

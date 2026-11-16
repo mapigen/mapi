@@ -8,6 +8,8 @@ from itertools import islice
 from pathlib import Path
 from typing import Any
 
+from mapi.constants import OPENAPI_EXT_ZST
+
 from .converter import normalize_spec
 from .extractor import extract_operations_and_components, save_metadata
 from .utils import extract_auth_info
@@ -34,7 +36,7 @@ def process_single_service(
     try:
         service_data_dir = data_dir / provider / source / api
         t_parse_start = time.perf_counter()
-        compressed_spec_path = service_data_dir / f"{api}.openapi.json.zst"
+        compressed_spec_path = service_data_dir / f"{api}{OPENAPI_EXT_ZST}"
         compressed_content = compressed_spec_path.read_bytes()
         raw_spec = dict(normalize_spec(compressed_content=compressed_content))
         metrics["parse_duration"] = time.perf_counter() - t_parse_start

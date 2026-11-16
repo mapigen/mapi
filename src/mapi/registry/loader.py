@@ -11,6 +11,7 @@ from ..constants import (
     DEFAULT_DATA_DIR_NAME,
     ENV_MAPI_DATA_DIR,
     ENV_MAPI_REGISTRY_PATH,
+    EXT_DB,
     MAPI_EXT_JSON,
     MAPI_EXT_MSGPACK,
     MAPI_EXT_MSGPACK_ZST,
@@ -61,7 +62,7 @@ class DiskLoader:
         self._packfile: PackfileLoader | None = None
         if self.packfile_path is not None and self.packfile_path.exists():
             self._packfile = PackfileLoader(self.packfile_path)
-        elif self.registry_path.suffix == ".db" and self.registry_path.exists():
+        elif self.registry_path.suffix == EXT_DB and self.registry_path.exists():
             self._packfile = PackfileLoader(self.registry_path)
 
         self._dctx = zstd.ZstdDecompressor()

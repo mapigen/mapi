@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from mapi.constants import OPENAPI_EXT_ZST
 from tests import helpers
 from tools import pipeline, utils
 
@@ -45,7 +46,7 @@ def test_process_single_service_failure(tmp_path: Path):
     service_name = "corrupted_service"
     service_data_dir = tmp_path / "data" / service_name
     service_data_dir.mkdir(parents=True)
-    spec_path = service_data_dir / f"{service_name}.openapi.json.zst"
+    spec_path = service_data_dir / f"{service_name}{OPENAPI_EXT_ZST}"
     spec_path.write_bytes(b"not a valid zstd stream")
 
     service_info = {

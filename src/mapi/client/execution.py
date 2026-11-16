@@ -397,6 +397,50 @@ class RequestExecutor:
         except Exception as exc:
             _handle_transport_error(exc, service_name, operation)
 
+    def batch(
+        self,
+        requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],
+        *,
+        return_exceptions: bool = False,
+    ) -> list[Any]:
+        """
+        Execute multiple API operations synchronously in a sequential loop.
+        Provides a convenient batching interface without concurrency overhead.
+        """
+        results: list[Any] = []
+        for req in requests:
+            try:
+                if isinstance(req, BatchRequest):
+                    source = req.source or (
+                        self._client._discovery.get_api_info(req.provider, req.api).sources[0]
+                        if hasattr(self._client, "_discovery")
+                        else DEFAULT_SOURCE
+                    )
+                    res = self.execute(
+                        req.provider,
+                        req.api,
+                        source,
+                        req.operation,
+                        _type=req.type,
+                        _raw=req.raw,
+                        **req.kwargs,
+                    )
+                else:
+                    provider, api, operation, kw = req
+                    source = (
+                        self._client._discovery.get_api_info(provider, api).sources[0]
+                        if hasattr(self._client, "_discovery")
+                        else DEFAULT_SOURCE
+                    )
+                    res = self.execute(provider, api, source, operation, **kw)
+                results.append(res)
+            except Exception as exc:
+                if return_exceptions:
+                    results.append(exc)
+                else:
+                    raise
+        return results
+
     async def abatch(
         self,
         requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],
@@ -415,7 +459,7 @@ class RequestExecutor:
                     source = req.source or (
                         self._client._discovery.get_api_info(req.provider, req.api).sources[0]
                         if hasattr(self._client, "_discovery")
-                        else "default"
+                        else DEFAULT_SOURCE
                     )
                     return await self.aexecute(
                         req.provider,
@@ -430,7 +474,7 @@ class RequestExecutor:
                 source = (
                     self._client._discovery.get_api_info(provider, api).sources[0]
                     if hasattr(self._client, "_discovery")
-                    else "default"
+                    else DEFAULT_SOURCE
                 )
                 return await self.aexecute(provider, api, source, operation, **kw)
 

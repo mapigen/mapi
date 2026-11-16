@@ -11,6 +11,8 @@ from typing import Any
 
 import msgspec
 
+from mapi.constants import DEFAULT_DATA_DIR_NAME, PRIMARY_REGISTRY_FILENAME
+
 from .fetcher import fetch_specs_concurrently
 from .pipeline import run_processing_pipeline
 from .registry_builder import RegistryBuilder
@@ -22,11 +24,11 @@ log = logging.getLogger("mapi.tools.populate")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT_DIR / "src" / "mapi"
-DATA_DIR = SRC_DIR / "data"
+DATA_DIR = SRC_DIR / DEFAULT_DATA_DIR_NAME
 REGISTRY_DIR = ROOT_DIR / "registry"
 OVERRIDES_PATH = REGISTRY_DIR / "overrides.json"
 POPULARITY_PATH = REGISTRY_DIR / "popularity.json"
-SERVICES_JSON_PATH = SRC_DIR / "mapi-registry.json"
+REGISTRY_PATH = SRC_DIR / PRIMARY_REGISTRY_FILENAME
 
 
 def get_rank(service: str) -> int:
@@ -163,14 +165,14 @@ def main():
             if target_path:
                 handle_mapi_compression(target_path, args.no_compress_mapi)
 
-    builder = RegistryBuilder(data_dir=args.data_dir, registry_path=SERVICES_JSON_PATH)
+    builder = RegistryBuilder(data_dir=args.data_dir, registry_path=REGISTRY_PATH)
     registry = builder.build_registry()
     builder.save_registry(registry)
 
     # Mirror to top-level mapi-registry.json
-    top_level_registry = ROOT_DIR / "mapi-registry.json"
-    if SERVICES_JSON_PATH.exists():
-        top_level_registry.write_bytes(SERVICES_JSON_PATH.read_bytes())
+    top_level_registry = ROOT_DIR / PRIMARY_REGISTRY_FILENAME
+    if REGISTRY_PATH.exists():
+        top_level_registry.write_bytes(REGISTRY_PATH.read_bytes())
 
     total_duration = time.perf_counter() - overall_start
     generate_performance_report(download_results, processing_results, total_duration)

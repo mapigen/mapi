@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from mapi.constants import DEFAULT_DATA_DIR_NAME, PRIMARY_REGISTRY_FILENAME
 from mapi.models.domain import Parameter, ParameterRef, ServiceData
 from mapi.registry.discovery import DiscoveryService, RegistryManager
 from mapi.registry.loader import DiskLoader
@@ -15,13 +16,8 @@ FORMAT_VERSION = 3
 log = logging.getLogger("mapi.tools.validate")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_DATA_DIR = ROOT_DIR / "src" / "mapi" / "data"
-_PRIMARY_REGISTRY = ROOT_DIR / "src" / "mapi" / "mapi-registry.json"
-DEFAULT_REGISTRY_PATH = (
-    _PRIMARY_REGISTRY
-    if _PRIMARY_REGISTRY.exists()
-    else ROOT_DIR / "src" / "mapi" / "services.json"
-)
+DEFAULT_DATA_DIR = ROOT_DIR / "src" / "mapi" / DEFAULT_DATA_DIR_NAME
+DEFAULT_REGISTRY_PATH = ROOT_DIR / "src" / "mapi" / PRIMARY_REGISTRY_FILENAME
 
 
 def validate_operations_and_refs(data: ServiceData, service_name: str) -> list[str]:

@@ -12,6 +12,8 @@ from typing import Any
 import msgspec
 import niquests
 
+from mapi.constants import OPENAPI_EXT_JSON, OPENAPI_EXT_ZST
+
 from .utils import compress_zstd
 
 log = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ def fetch_single_spec(
     no_compress_original: bool = False,
 ) -> dict[str, Any]:
     service_data_dir = data_dir / provider / source / api
-    spec_path_zst = service_data_dir / f"{api}.openapi.json.zst"
+    spec_path_zst = service_data_dir / f"{api}{OPENAPI_EXT_ZST}"
 
     if (
         not force_reprocess
@@ -69,7 +71,7 @@ def fetch_single_spec(
         spec_path_zst.write_bytes(compress_zstd(content))
 
         if no_compress_original:
-            (service_data_dir / f"{api}.openapi.json").write_bytes(content)
+            (service_data_dir / f"{api}{OPENAPI_EXT_JSON}").write_bytes(content)
 
         return {
             "status": "success",

@@ -77,10 +77,12 @@ MAPI_EXT_ZST: str = ".mapi.json.zst"
 MAPI_EXT_MSGPACK: str = ".mapi.msgpack"
 MAPI_EXT_MSGPACK_ZST: str = ".mapi.msgpack.zst"
 OPENAPI_EXT_JSON: str = ".openapi.json"
+OPENAPI_EXT_ZST: str = ".openapi.json.zst"
 OPENAPI_EXT_YAML: str = ".openapi.yaml"
 EXT_JSON: str = ".json"
 EXT_YAML: str = ".yaml"
 EXT_YML: str = ".yml"
+EXT_DB: str = ".db"
 
 # Packfile Binary Constants
 PACKFILE_ZSTD_MAGIC: bytes = b"\x28\xb5\x2f\xfd"

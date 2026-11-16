@@ -257,6 +257,19 @@ class Mapi:
             **kwargs,
         )
 
+    def batch(
+        self,
+        requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],
+        *,
+        return_exceptions: bool = False,
+    ) -> list[Any]:
+        """Execute multiple API operations synchronously in a sequential loop."""
+        executor = getattr(self, "_executor", None)
+        if executor is None:
+            executor = RequestExecutor(self)
+            self._executor = executor
+        return executor.batch(requests, return_exceptions=return_exceptions)
+
     async def abatch(
         self,
         requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],
