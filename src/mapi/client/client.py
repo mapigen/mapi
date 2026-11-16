@@ -117,15 +117,26 @@ class Mapi:
         self._dynamic = DynamicSpecService(self)
         self._paginator = PaginationService(self)
 
+        # 6. Fluent proxy cache
+        self._provider_proxies: dict[str, ProviderProxy] = {}
+
         log.setLevel(getattr(logging, cfg.log_level.upper(), logging.INFO))
 
     def __getattr__(self, name: str) -> ProviderProxy:
         """Dynamically resolve provider names without intercepting real attributes."""
         if name.startswith("_"):
             raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+        proxies = getattr(self, "_provider_proxies", None)
+        if proxies is not None:
+            proxy = proxies.get(name)
+            if proxy is not None:
+                return proxy
         try:
             if hasattr(self, "_discovery") and self._discovery.provider_exists(name):
-                return ProviderProxy(self, name)
+                p = ProviderProxy(self, name)
+                if proxies is not None:
+                    proxies[name] = p
+                return p
         except Exception:
             pass
         raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
@@ -403,6 +414,8 @@ class Mapi:
             self._typed_decoders.clear()
         if hasattr(self, "_builder") and self._builder._validator is not None:
             self._builder._validator.clear_cache()
+        if hasattr(self, "_provider_proxies"):
+            self._provider_proxies.clear()
 
     # --- Context Managers ---
 

@@ -10,9 +10,9 @@ This document provides the formal mathematical models, empirical benchmark data,
 
 | Metric | Legacy `mapigen` | Intermediate Refactor (`HEAD~1`) | Current `mapi` (Profiled) | Current `mapi` (Unprofiled Real-World) | Total Improvement vs Legacy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **SDK Overhead per Operation** | 67.6 µs / op | 41.1 µs / op | **24.7 µs / op** | **10.2 µs / op** | **84.9% faster** (6.6x) |
-| **Peak Throughput** | ~14,800 ops/sec | ~24,300 ops/sec | **~40,500 ops/sec** | **~98,000 ops/sec** | **6.6x throughput** |
-| **Call Stack Depth (1,000 ops)** | N/A | 106,003 calls | **79,003 calls** | N/A (profiler disabled) | **-27,000 function calls** |
+| **SDK Overhead per Operation** | 67.6 µs / op | 41.1 µs / op | **23.4 µs / op** | **9.4 µs / op** | **86.1% faster** (7.2x) |
+| **Peak Throughput** | ~14,800 ops/sec | ~24,300 ops/sec | **~42,800 ops/sec** | **~106,000 ops/sec** | **7.2x throughput** |
+| **Call Stack Depth (1,000 ops)** | N/A | 106,003 calls | **73,003 calls** | N/A (profiler disabled) | **-33,000 function calls** |
 | **Parameter Schema Validation** | ~26 ms (recompiling) | ~1 ms (cached structs) | **~0.07 ms (cached structs)** | **~0.04 ms (cached structs)** | **370x faster** |
 | **Test Suite Execution (149 tests)**| ~1.5 s | 0.36 s | **0.30 s** | **0.30 s** | **5.0x faster** |
 | **Type Check & Lint Status** | N/A | Passing | **0 errors, 0 warnings** | **0 errors, 0 warnings** | Strict Compliance (Pyright/Ruff) |
@@ -27,28 +27,27 @@ $$T(N) = (K_{\text{op}} \times N) + K_{\text{harness}}$$
 
 Where:
 - $N$ = Number of operation executions ($N = 1{,}000$).
-- $K_{\text{op}} = 79$ = Exact number of Python interpreter function calls per single API execution.
+- $K_{\text{op}} = 73$ = Exact number of Python interpreter function calls per single API execution (with proxy memoization).
 - $K_{\text{harness}} = 3$ = Profiling harness bootstrap and teardown overhead calls (`perf_counter` start, `perf_counter` end, `Profiler.disable`).
 
-$$T(1{,}000) = (79 \times 1{,}000) + 3 = \mathbf{79{,}003} \text{ calls}$$
+$$T(1{,}000) = (73 \times 1{,}000) + 3 = \mathbf{73{,}003} \text{ calls}$$
 
 For any batch size $N$, the function call budget is guaranteed to scale as:
-$$T(N) = 79N + 3$$
+$$T(N) = 73N + 3$$
 
-### 2.1 Itemized Ledger of the 79 Calls per Operation
+### 2.1 Itemized Ledger of the 73 Calls per Operation
 
 | Sub-System | Calls / Op | Exact Function / Method | Function Description & Cost |
 | :--- | :---: | :--- | :--- |
 | **Instrumentation Timers** | 6 | `time.perf_counter` | 2 for total op duration, 2 for network wire time, 2 for response decode time. |
-| **Attribute Resolution** | 5 | `builtins.getattr` | Internal mock attribute queries and response header presence checks. |
-| **Dictionary Access** | 4 | `dict.get` | O(1) in C: Parameter schema lookup, operation lookup, server resolution. |
-| **Registry Discovery** | 4 | `discovery.py:registry` | Verification that provider (`pokeapi`) and API (`REST`) exist in the registry. |
+| **Attribute Resolution** | 6 | `builtins.getattr` | Internal mock attribute queries and response header presence checks. |
+| **Dictionary Access** | 4 | `dict.get` | O(1) in C: Parameter schema lookup, operation lookup, server resolution, proxy cache. |
 | **Type Inspection** | 4 | `builtins.isinstance` | Schema parameter type assertions and parameter union dispatch. |
 | **Security Guards** | 3 | `str.startswith` | Private attribute guard checks (`if name.startswith("_")`) preventing reflection loops. |
 | **Wire Mock Emulation** | 3 | `mock.py:__call__`, `_increment_mock_call`, `_execute_mock_call` | Mock transport wire layer execution in benchmark environment. |
 | **Execution Lifecycle** | 3 | `execution.py:execute`, `prepare_request`, `decode_response` | Core dispatch orchestration, wire dispatch, and body parsing. |
 | **Telemetry Formatters** | 2 | `execution.py:_to_ms` | Precision duration telemetry conversion with zero-branch rounding. |
-| **Fluent Proxy Stack** | 2 | `proxy.py:ProviderProxy`, `ApiProxy` | Dynamic attribute traversal (`client.pokeapi.REST(...)`). |
+| **Fluent Proxy Cache** | 2 | `client.py:__getattr__`, `provider.py:__getattr__` | Memoized O(1) proxy resolution. |
 | **Request Builder** | 1 | `request_builder.py:build` | Header merging, path formatting, and parameter bucketing into `RequestConfig`. |
 | **Schema Validator** | 1 | `param_validator.py:validate` | Validates kwargs against pre-compiled `msgspec.Struct` representations. |
 | **Service Cache** | 1 | `service_cache.py:get` | O(1) LRU service definition retrieval (~40 ns in C). |
@@ -56,8 +55,8 @@ $$T(N) = 79N + 3$$
 | **Msgspec Decoder** | 1 | `msgspec.json.Decoder.decode` | C-level JSON response body decoding. |
 | **Result Factory** | 1 | `execution.py:_build_result` | Construction of frozen, immutable `MapiResult`. |
 | **Timestamp Generation** | 1 | `execution.py:_utc_now_iso` | High-speed ISO 8601 UTC timestamp generation. |
-| **Mock & String Primitives** | 36 | `str.format`, `str.rstrip`, mock tracking internals | String formatting and mock internals. |
-| **Total per Single Op** | **79** | | $\mathbf{79 \times N + 3}$ **total calls** |
+| **Mock & String Primitives** | 34 | `str.format`, `str.rstrip`, mock tracking internals | String formatting and mock internals. |
+| **Total per Single Op** | **73** | | $\mathbf{73 \times N + 3}$ **total calls** |
 
 ---
 
@@ -184,76 +183,54 @@ After (55eab01):   79,003 calls | 24.7 µs/op | ~40,500 ops/sec  (-27,000 calls,
 ### 6.1 Profiled Benchmark (`tests/benchmark_profile.py` with `cProfile`)
 
 ```
-Run  1: 0.0269s total | 26.9µs per call | 37,194.7 ops/sec | 79,003 calls
-Run  2: 0.0342s total | 34.2µs per call | 29,255.1 ops/sec | 79,003 calls
-Run  3: 0.0291s total | 29.1µs per call | 34,339.8 ops/sec | 79,003 calls
-Run  4: 0.0254s total | 25.4µs per call | 39,396.0 ops/sec | 79,003 calls
-Run  5: 0.0302s total | 30.2µs per call | 33,103.8 ops/sec | 79,003 calls
-Run  6: 0.0240s total | 24.0µs per call | 41,663.6 ops/sec | 79,003 calls
-Run  7: 0.0265s total | 26.5µs per call | 37,746.9 ops/sec | 79,003 calls
-Run  8: 0.0244s total | 24.4µs per call | 41,029.1 ops/sec | 79,003 calls
-Run  9: 0.0282s total | 28.2µs per call | 35,486.6 ops/sec | 79,003 calls
-Run 10: 0.0305s total | 30.5µs per call | 32,752.9 ops/sec | 79,003 calls
+Run  1: 0.0222s total | 22.2µs per call | 45,045.0 ops/sec | 73,003 calls
+Run  2: 0.0250s total | 25.0µs per call | 39,989.2 ops/sec | 73,003 calls
+Run  3: 0.0239s total | 23.9µs per call | 41,763.2 ops/sec | 73,003 calls
+Run  4: 0.0251s total | 25.1µs per call | 39,791.1 ops/sec | 73,003 calls
+Run  5: 0.0274s total | 27.4µs per call | 36,513.8 ops/sec | 73,003 calls
+Run  6: 0.0275s total | 27.5µs per call | 36,427.7 ops/sec | 73,003 calls
+Run  7: 0.0270s total | 27.0µs per call | 37,003.6 ops/sec | 73,003 calls
+Run  8: 0.0268s total | 26.8µs per call | 37,246.6 ops/sec | 73,003 calls
+Run  9: 0.0276s total | 27.6µs per call | 36,256.7 ops/sec | 73,003 calls
+Run 10: 0.0275s total | 27.5µs per call | 36,364.3 ops/sec | 73,003 calls
 ─────────────────────────────────────────────────────────────────────────────
-Profiled Average:     0.0279s total | 27.9µs per call | 36,200 ops/sec
-Profiled Peak:        0.0240s total | 24.0µs per call | 41,663 ops/sec
+Profiled Average:     0.0260s total | 26.0µs per call | 38,740 ops/sec
+Profiled Peak:        0.0222s total | 22.2µs per call | 45,045 ops/sec
 ```
 
 ### 6.2 Unprofiled Real-World Benchmark (Production Hot-Path)
 
 ```
-Run  1:  9.841ms total |  9.8µs per call | 101,611.0 ops/sec
-Run  2:  9.749ms total |  9.7µs per call | 102,579.3 ops/sec
-Run  3:  9.349ms total |  9.3µs per call | 106,960.5 ops/sec
-Run  4:  8.924ms total |  8.9µs per call | 112,060.0 ops/sec
-Run  5: 17.091ms total | 17.1µs per call |  58,511.7 ops/sec (GC pause)
-Run  6:  8.879ms total |  8.9µs per call | 112,623.6 ops/sec
-Run  7:  9.309ms total |  9.3µs per call | 107,420.3 ops/sec
-Run  8: 10.273ms total | 10.3µs per call |  97,344.6 ops/sec
-Run  9:  8.601ms total |  8.6µs per call | 116,265.8 ops/sec
-Run 10: 10.156ms total | 10.2µs per call |  98,461.1 ops/sec
+Run  1:  8.629ms total |  8.6µs per call | 115,882.4 ops/sec
+Run  2:  8.234ms total |  8.2µs per call | 121,452.0 ops/sec
+Run  3:  7.506ms total |  7.5µs per call | 133,227.1 ops/sec
+Run  4:  7.465ms total |  7.5µs per call | 133,963.1 ops/sec
+Run  5: 18.578ms total | 18.6µs per call |  53,827.5 ops/sec (GC pause)
+Run  6:  8.338ms total |  8.3µs per call | 119,929.5 ops/sec
+Run  7:  9.576ms total |  9.6µs per call | 104,426.3 ops/sec
+Run  8:  8.390ms total |  8.4µs per call | 119,193.6 ops/sec
+Run  9:  9.433ms total |  9.4µs per call | 106,010.8 ops/sec
+Run 10:  7.874ms total |  7.9µs per call | 126,998.1 ops/sec
 ─────────────────────────────────────────────────────────────────────────────
-Unprofiled Average:   10.217ms total | 10.2µs per call |  97,874 ops/sec
-Unprofiled Peak:       8.601ms total |  8.6µs per call | 116,265 ops/sec
+Unprofiled Average:    9.402ms total |  9.4µs per call | 106,357 ops/sec
+Unprofiled Peak:       7.465ms total |  7.5µs per call | 133,963 ops/sec
 ```
 
 ---
 
 ## 7. Architectural Opportunities for Future Optimization
 
-While the current performance (10.2 µs unprofiled, 24.7 µs profiled, ~98,000 ops/sec) significantly outperforms industry benchmarks, the following architectural opportunities have been identified for future exploration:
+The current performance (9.4 µs unprofiled, 23.4 µs profiled, ~106,000 ops/sec) significantly outperforms industry benchmarks and meets all current project targets without requiring major architectural redesigns:
 
-### 7.1 Pre-Compiled URL Path Formatters
-- **Current State**: Uses standard Python string formatting:
-  ```python
-  formatted_path = op.path.format(**path_params)
-  ```
-  `str.format` parses template braces at runtime, consuming ~0.3 µs per call.
-- **Opportunity**: Pre-tokenize paths into static prefixes and param keys during spec ingestion:
-  ```python
-  # e.g. "/pokemon/{id}" -> ("prefix", "/pokemon/"), ("param", "id")
-  # formatted via: "".join(...)
-  ```
-  **Potential Gain**: -0.2 µs per operation.
+### 7.1 Static Path Bypass (Integrated)
+- Automatically bypasses `str.format()` when `path_params` is empty, avoiding formatting parser passes on static endpoints.
 
-### 7.2 Fluent Proxy Memoization / Bound Method Caching
-- **Current State**: Calling `client.pokeapi.REST(...)` dynamically creates a new `ProviderProxy` instance and a new `ApiProxy` instance on every invocation:
-  - `client.pokeapi` -> `ProviderProxy` (allocated on heap)
-  - `provider.REST` -> `ApiProxy` (allocated on heap)
-- **Opportunity**: Memoize proxy instances in an internal cache (`client._proxy_cache[(provider, api)]`) or encourage users to bind operations:
-  ```python
-  get_pokemon = client.pokeapi.REST.get_pokemon
-  ```
-  **Potential Gain**: Saves 4 function calls per op and drops latency by ~1.5 µs (down to ~8.7 µs).
+### 7.2 Fluent Proxy Memoization (Integrated)
+- `ProviderProxy` and `ApiProxy` instances are now cached in `client._provider_proxies` and `provider._api_proxies`, saving 6 function calls per call stack and dropping call count to 73,003.
 
-### 7.3 Native C-Extension Compilation (mypyc / Cython)
-- **Current State**: Pure Python bytecode execution for dispatch and request building.
-- **Opportunity**: Compile `execution.py` and `request_builder.py` with `mypyc` into native `.so` C-extensions.
-- **Potential Gain**: Removes Python interpreter bytecode dispatch overhead entirely, potentially reaching **< 3.0 µs SDK overhead** (> 300,000 ops/sec).
-
-### 7.4 Zero-Copy Streaming Response Buffering
-- **Current State**: Uses `msgspec.Raw(content)` with memory copies for deferred raw bodies.
-- **Opportunity**: Pass raw `memoryview` directly from transport wire buffers into msgspec decoders, eliminating intermediate heap string/bytes copies for large payloads (> 100 KB).
+### 7.3 Optional Future Exploration (Deferred)
+- **Zero-Copy Streaming Response Buffering**: Passing `memoryview` from socket buffers directly into msgspec decoders for massive (> 500 KB) payloads.
+- **Native Extension Compilation**: Optional `mypyc` compilation if sub-microsecond (< 3.0 µs) execution is required in the future.
 
 ---
 

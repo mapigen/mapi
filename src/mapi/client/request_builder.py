@@ -165,14 +165,17 @@ class RequestBuilder:
                 headers[param.name] = str(value)
 
         # 5. Format path
-        try:
-            formatted_path = op.path.format(**path_params)
-        except KeyError as exc:
-            raise ServiceNotFoundError(
-                f"Missing required path parameter: {exc}",
-                service=service_name,
-                operation=operation,
-            ) from exc
+        if path_params:
+            try:
+                formatted_path = op.path.format(**path_params)
+            except KeyError as exc:
+                raise ServiceNotFoundError(
+                    f"Missing required path parameter: {exc}",
+                    service=service_name,
+                    operation=operation,
+                ) from exc
+        else:
+            formatted_path = op.path
 
         clean_path = formatted_path if formatted_path.startswith("/") else f"/{formatted_path}"
         full_url = f"{resolved_base_url.rstrip('/')}{clean_path}"
