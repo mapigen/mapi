@@ -166,6 +166,7 @@ class Mapi:
         self._transport = transport or NiquestsTransport(**transport_kwargs)
         self._config = cfg
         self._json_decoder = msgspec.json.Decoder()
+        self._typed_decoders: dict[Any, msgspec.json.Decoder[Any]] = {}
 
         log.setLevel(getattr(logging, cfg.log_level.upper(), logging.INFO))
 
@@ -199,12 +200,36 @@ class Mapi:
         )
         return service_name, config
 
-    def _decode_response(self, response: Any) -> Any:
+    def _decode_response(
+        self,
+        response: Any,
+        target_type: Any = None,
+        raw: bool = False,
+    ) -> Any:
         """Decode response body directly with msgspec C decoder, falling back to response.json()."""
         content = getattr(response, "content", None)
+        if raw:
+            return (
+                msgspec.Raw(content)
+                if isinstance(content, (bytes, bytearray, memoryview))
+                else content
+            )
+
         if isinstance(content, (bytes, bytearray, memoryview)) and content:
+            if target_type is not None:
+                decoders = getattr(self, "_typed_decoders", None)
+                if decoders is not None:
+                    decoder = decoders.get(target_type)
+                    if decoder is None:
+                        decoder = msgspec.json.Decoder(target_type)
+                        decoders[target_type] = decoder
+                    return decoder.decode(content)
+                return msgspec.json.decode(content, type=target_type)
             try:
-                return self._json_decoder.decode(content)
+                decoder = getattr(self, "_json_decoder", None)
+                if decoder is not None:
+                    return decoder.decode(content)
+                return msgspec.json.decode(content)
             except Exception:
                 pass
         if hasattr(response, "json") and callable(response.json):
@@ -215,15 +240,26 @@ class Mapi:
         return None
 
     def execute(
-        self, provider: str, api: str, source: str, operation: str, **kwargs: Any
+        self,
+        provider: str,
+        api: str,
+        source: str,
+        operation: str,
+        *,
+        _type: Any = None,
+        _raw: bool = False,
+        **kwargs: Any,
     ) -> MapiResult:
         """Execute an API operation synchronously."""
+        target_type = _type or kwargs.pop("target_type", None) or kwargs.pop("_type", None)
+        raw = _raw or kwargs.pop("raw", False) or kwargs.pop("_raw", False)
+
         (service_name, config), prep_time = _measure(
             self._prepare_request, provider, api, source, operation, kwargs
         )
         try:
             response, net_time = _measure(self._transport.request, config, auth=self._auth)
-            data, post_time = _measure(self._decode_response, response)
+            data, post_time = _measure(self._decode_response, response, target_type, raw)
             return _build_result(
                 service_name, operation, response.status_code, data, prep_time + post_time, net_time
             )
@@ -233,15 +269,26 @@ class Mapi:
             _handle_transport_error(exc, service_name, operation)
 
     async def aexecute(
-        self, provider: str, api: str, source: str, operation: str, **kwargs: Any
+        self,
+        provider: str,
+        api: str,
+        source: str,
+        operation: str,
+        *,
+        _type: Any = None,
+        _raw: bool = False,
+        **kwargs: Any,
     ) -> MapiResult:
         """Execute an API operation asynchronously."""
+        target_type = _type or kwargs.pop("target_type", None) or kwargs.pop("_type", None)
+        raw = _raw or kwargs.pop("raw", False) or kwargs.pop("_raw", False)
+
         (service_name, config), prep_time = _measure(
             self._prepare_request, provider, api, source, operation, kwargs
         )
         try:
             response, net_time = await _ameasure(self._transport.arequest(config, auth=self._auth))
-            data, post_time = _measure(self._decode_response, response)
+            data, post_time = _measure(self._decode_response, response, target_type, raw)
             return _build_result(
                 service_name, operation, response.status_code, data, prep_time + post_time, net_time
             )
@@ -251,8 +298,10 @@ class Mapi:
             _handle_transport_error(exc, service_name, operation)
 
     def clear_cache(self) -> None:
-        """Flush the in-memory service definitions cache and validator structs."""
+        """Flush the in-memory service definitions cache, typed decoders, and validator structs."""
         self._cache.clear()
+        if hasattr(self, "_typed_decoders"):
+            self._typed_decoders.clear()
         if self._builder._validator is not None:
             self._builder._validator.clear_cache()
 

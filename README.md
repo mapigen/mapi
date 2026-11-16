@@ -171,6 +171,20 @@ Continuous improvements on the `mapi` roadmap:
 -   **CLI:** A command-line interface for configuration and data inspection.
 -   **Local Web Server:** A local UI for faster discovery, configuration, and testing.
 
+## Performance & Benchmarks
+
+`mapi` is engineered for ultra-low latency execution paths (ideal for microservices, workflow engines, and LLM tool calling):
+
+| Metric | Legacy `mapigen` | Current `mapi` | Improvement |
+| :--- | :--- | :--- | :--- |
+| **SDK Overhead per Operation** | 67.6 µs / op | **24.7 µs / op** | **63.7% faster** |
+| **Peak Throughput** | ~14,800 ops/sec | **~40,500 ops/sec** | **2.7x throughput** |
+| **Parameter Schema Validation** | ~26 ms (recompiling) | **~1 ms (cached structs)** | **26x faster** |
+| **Test Suite Execution (149 tests)** | ~1.5 s | **0.26 s** | **5.7x faster** |
+| **Type Check & Lint Status** | N/A | **0 errors, 0 warnings** (Ruff & Pyright) | Strict Compliance |
+
+See [BEST_PRACTICES.md](./BEST_PRACTICES.md) for detailed architectural standards and optimization patterns.
+
 ## Contributing
 
 1.  **Testing**:

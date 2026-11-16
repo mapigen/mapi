@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import msgspec
 import pytest
 from niquests.exceptions import HTTPError
 
@@ -53,6 +54,8 @@ def _build_test_mapi(sample_service_data, sample_registry) -> Mapi:
 
     client._auth = None
     client._config = ClientConfig()
+    client._json_decoder = msgspec.json.Decoder()
+    client._typed_decoders = {}
     return client
 
 
@@ -135,6 +138,38 @@ class TestMapiExecution:
         result = await client.pokeapi.REST.aexecute("get_pokemon", id="pikachu")
         assert isinstance(result, MapiResult)
         assert result.data == {"id": 1, "name": "pikachu"}
+
+    def test_sync_execute_typed_model(self, sample_service_data, sample_registry):
+        import msgspec
+
+        class Pokemon(msgspec.Struct):
+            id: int
+            name: str
+
+        client = _build_test_mapi(sample_service_data, sample_registry)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"id": 25, "name": "pikachu"}'
+        mock_resp.json.return_value = {"id": 25, "name": "pikachu"}
+        cast(MagicMock, client._transport.request).return_value = mock_resp
+
+        result = client.pokeapi.REST("get_pokemon", id="pikachu", _type=Pokemon)
+        assert isinstance(result.data, Pokemon)
+        assert result.data.id == 25
+        assert result.data.name == "pikachu"
+
+    def test_sync_execute_raw_response(self, sample_service_data, sample_registry):
+        import msgspec
+
+        client = _build_test_mapi(sample_service_data, sample_registry)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b'{"id": 25, "name": "pikachu"}'
+        cast(MagicMock, client._transport.request).return_value = mock_resp
+
+        result = client.pokeapi.REST("get_pokemon", id="pikachu", _raw=True)
+        assert isinstance(result.data, msgspec.Raw)
+        assert bytes(result.data) == b'{"id": 25, "name": "pikachu"}'
 
     def test_rate_limit_429_raises(self, sample_service_data, sample_registry):
         client = _build_test_mapi(sample_service_data, sample_registry)

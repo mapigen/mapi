@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import msgspec
+
 from ..cache.service_cache import ServiceCache
 from ..exceptions import ServiceNotFoundError
 from ..models.domain import Parameter, ParameterRef
@@ -80,6 +82,8 @@ class RequestBuilder:
                 continue
 
             value = kwargs[param.name]
+            if isinstance(value, msgspec.Struct):
+                value = msgspec.to_builtins(value)
             if param.in_ == "path":
                 path_params[param.name] = value
             elif param.in_ == "query":

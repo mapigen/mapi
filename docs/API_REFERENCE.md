@@ -1,231 +1,188 @@
-# Mapigen API Reference
+# Mapi API Reference
 
 ## 1. Introduction
 
-This document provides a detailed technical reference for the `mapigen` Python library. It is intended for developers who are using the library and need to understand its classes, methods, and data structures in detail.
+This document provides a detailed technical reference for the `mapi` Universal API Client SDK. It covers all core client classes, dynamic proxies, authentication strategies, data models, error taxonomies, and performance characteristics.
 
-For a general overview, installation instructions, and quickstart examples, please see the [README.md](../README.md).
+For installation instructions and quickstart examples, see the [README.md](../README.md) and [BEST_PRACTICES.md](../BEST_PRACTICES.md).
+
+---
 
 ## 2. The `Mapi` Client
 
-The `mapigen.Mapi` class is the primary entry point for all interactions with the library.
+The `mapi.Mapi` class is the primary entry point for all operations.
 
-### 2.1. Initialization
-
-You initialize the client by creating an instance of the `Mapi` class.
+### 2.1 Initialization
 
 ```python
-from mapigen import Mapi
+from mapi import Mapi, ClientConfig, BearerAuth
 
-mapi = Mapi(auth=None, default_timeout=30.0, log_level="INFO", validate_on_execute=True)
+# Default initialization (reads services.json from bundled registry)
+client = Mapi()
+
+# Custom configuration with Bearer token
+client = Mapi(
+    auth=BearerAuth("ghp_myToken"),
+    base_url="https://api.github.com",
+    config=ClientConfig(default_timeout=15.0, log_level="DEBUG"),
+)
 ```
 
-**Constructor: `Mapi(auth, default_timeout, log_level, validate_on_execute, **transport_kwargs)`**
+**Constructor Parameters:**
+* **`config`** (`Optional[ClientConfig]`): Immutable client configuration.
+* **`auth`** (`Optional[Union[AuthBase, str]]`): An authentication object (`BearerAuth`, `ApiKeyAuth`) or raw token string (automatically wrapped in `BearerAuth`).
+* **`transport`** (`Optional[NiquestsTransport]`): Custom HTTP transport (defaults to a managed `NiquestsTransport` instance).
+* **`data_dir`** (`Optional[Path]`): Override path for service definitions (`utilize.json.zst`).
+* **`registry_path`** (`Optional[Path]`): Override path for `services.json`.
+* **`base_url`** (`Optional[str]`): Override default server URL declared in OpenAPI specifications.
+* **`**transport_kwargs`**: Arbitrary arguments forwarded to underlying `niquests.Session` / `AsyncSession` (e.g., `verify=False`).
 
--   **`auth`** (`Optional[AuthBase]`): An authentication object from the `niquests` library or a compatible class. See the [Authentication](#2.4-authentication) section for more details. Defaults to `None`.
--   **`default_timeout`** (`float`): The default timeout in seconds for all HTTP requests. Defaults to `30.0`.
--   **`log_level`** (`str`): The logging level for the client (e.g., `"INFO"`, `"DEBUG"`). Defaults to `"INFO"`.
--   **`validate_on_execute`** (`bool`): If `True`, the client will validate parameters against the API schema before making a request, raising a `MapiError` on failure. Defaults to `True`.
--   **`**transport_kwargs`**: Additional keyword arguments to pass to the underlying `niquests` HTTP transport, such as `verify=False` to disable SSL verification.
+---
 
-### 2.2. Executing Operations
+### 2.2 Executing Operations
 
-#### Proxy-Based Calls (Sync & Async)
+#### Dynamic Proxy Calls (Sync & Async)
+The recommended, IDE-friendly method for executing operations:
 
-This is the recommended, IDE-friendly method for calling API operations.
+* **Synchronous:**
+  ```python
+  # client.<provider>.<api>(<operation>, **kwargs)
+  result = client.pokeapi.REST("pokemon_retrieve", id="ditto")
+  print(result.data["name"])  # "ditto"
+  print(result.metadata.duration_ms)  # SDK ops time (ms)
+  print(result.metadata.network_duration_ms)  # HTTP wire round-trip time (ms)
+  ```
 
--   **Synchronous:**
-    ```python
-    # Returns a dict: {"data": ..., "metadata": ...}
-    response = mapi.pokeapi.api_v2_pokemon_retrieve(id="ditto")
-    ```
--   **Asynchronous:** Asynchronous operations are powered by `niquests`.
-    ```python
-    # This must be run inside an async function
-    async def fetch_pokemon():
-        response = await mapi.pokeapi.api_v2_pokemon_retrieve.aexecute(id="ditto")
-        return response
-    ```
+* **Asynchronous:**
+  ```python
+  result = await client.pokeapi.REST.aexecute("pokemon_retrieve", id="ditto")
+  ```
 
-#### Direct `execute()` and `aexecute()`
+* **Explicit Source Selection:**
+  ```python
+  result = client.pokeapi.REST.github("pokemon_retrieve", id="ditto")
+  ```
 
-These methods are ideal for dynamic scenarios where the service and operation names are not known until runtime.
+#### Strongly-Typed Returns (`_type=MyStruct`)
+You can direct Mapi to deserialize and validate directly into strongly-typed `msgspec.Struct` models at C-speed:
 
--   **`execute(service: str, operation: str, **kwargs: Any) -> Dict`**
-    -   Executes a synchronous API call.
-    -   **Returns:** A dictionary containing `data` and `metadata` keys.
+```python
+import msgspec
 
--   **`aexecute(service: str, operation: str, **kwargs: Any) -> Coroutine[Any, Any, Dict]`**
-    -   Asynchronously executes an API call using `niquests`.
-    -   **Returns:** A coroutine that resolves to a dictionary containing `data` and `metadata` keys.
 
-**Example:**
+class Pokemon(msgspec.Struct):
+    id: int
+    name: str
+
+
+result = client.pokeapi.REST("pokemon_retrieve", id="pikachu", _type=Pokemon)
+assert isinstance(result.data, Pokemon)
+print(result.data.id, result.data.name)
+```
+
+#### Deferred Raw Parsing (`_raw=True`)
+For high-volume pipelines, proxies, or file streaming where JSON deserialization into Python dictionaries is unneeded:
+
+```python
+result = client.pokeapi.REST("pokemon_retrieve", id="pikachu", _raw=True)
+# result.data is msgspec.Raw without Python dict allocation
+raw_bytes = bytes(result.data)
+```
+
+#### Direct Execution
+For dynamic workflow orchestrators and LLM tool executors where service identifiers are resolved at runtime:
+
 ```python
 # Sync
-response = mapi.execute("pokeapi", "api_v2_pokemon_retrieve", id="pikachu")
-
+result = client.execute("pokeapi", "REST", "github", "pokemon_retrieve", id="pikachu")
 
 # Async
-async def fetch_pikachu_async():
-    async_response = await mapi.aexecute("pokeapi", "api_v2_pokemon_retrieve", id="pikachu")
-    return async_response
+result = await client.aexecute("pokeapi", "REST", "github", "pokemon_retrieve", id="pikachu")
 ```
 
-### 2.3. Service Discovery
+---
 
-The `mapi.discovery` property provides access to a `DiscoveryClient` instance for exploring available services and operations.
+### 2.3 Service Discovery
 
--   **`list_services() -> List[str]`**: Returns a list of all available service names.
--   **`service_exists(service: str) -> bool`**: Checks if a service is available.
--   **`get_service_info(service: str) -> ServiceInfo`**: Returns a `ServiceInfo` data object for a service.
--   **`list_operations(service: str) -> List[str]`**: Returns a list of all operation IDs for a given service.
--   **`get_operation(service: str, operation: str) -> Operation`**: Returns a detailed `Operation` data object.
+Access discovery metadata via `client.discovery`:
 
-**Example:**
+* **`list_providers() -> List[str]`**: Returns all registered providers.
+* **`provider_exists(provider: str) -> bool`**: Checks if a provider exists.
+* **`list_apis(provider: str) -> List[str]`**: Lists APIs for a provider.
+* **`get_api_info(provider: str, api: str) -> ApiInfo`**: Returns API metadata (sources, operation count, popularity rank, auth schemes).
+* **`list_operations(provider: str, api: str, source: Optional[str] = None) -> List[str]`**: Lists all operations.
+* **`get_operation(provider: str, api: str, source: str, operation: str) -> Operation`**: Returns typed operation metadata.
+
+---
+
+### 2.4 Authentication
+
+Authentication strategies inherit from `niquests.auth.AuthBase`:
+
+* **`BearerAuth(token: str, scheme: str = "Bearer")`**: Attaches an `Authorization: <scheme> <token>` header.
+* **`ApiKeyAuth(key: str, name: str, placement: Literal["header", "query", "cookie"])`**: Injects an API key into requests.
+
 ```python
-if mapi.discovery.service_exists("github"):
-    info = mapi.discovery.get_service_info("github")
-    print(f"GitHub has {info.operation_count} operations.")
+from mapi import ApiKeyAuth
 
-    operations = mapi.discovery.list_operations("github")
-    print(f"First 5 operations: {operations[:5]}")
+auth = ApiKeyAuth(key="sec_12345", name="X-API-Key", placement="header")
+client = Mapi(auth=auth)
 ```
 
-### 2.4. Authentication
+---
 
-Authentication is handled by injecting a `niquests.auth.AuthBase` compatible object into the `Mapi` client's constructor via the `auth` parameter.
+### 2.5 Error Handling
 
-This dependency injection approach allows you to use any authentication mechanism that conforms to the `niquests` authentication interface.
+All SDK exceptions inherit from `mapi.exceptions.MapiError`:
 
-**Example with a standard `niquests` authenticator:**
+```text
+MapiError
+├── ConfigurationError
+├── ServiceNotFoundError
+├── ValidationError
+└── TransportError
+    ├── RateLimitError (HTTP 429)
+    ├── ServerError (HTTP 5xx)
+    └── ClientError (HTTP 4xx)
+```
+
+All `TransportError` exceptions expose `http_status`, `service`, and `operation` attributes.
+
+---
+
+## 3. Core Return Models
+
+All calls return an immutable `MapiResult`:
+
 ```python
-from niquests.auth import HTTPBasicAuth
-from mapigen import Mapi
-
-# Use a standard auth object from the underlying http library
-basic_auth = HTTPBasicAuth("user", "pass")
-
-mapi = Mapi(auth=basic_auth)
+class MapiResult(msgspec.Struct, frozen=True):
+    data: Optional[Any]
+    metadata: ResponseMetadata
 ```
 
-For convenience, `mapigen` also provides helper classes under the `mapigen.Auth` namespace that create common authentication objects for you. In the future, these helpers may be moved to a separate `mapitools` package.
+### `ResponseMetadata` Telemetry Schema
 
--   **`Auth.ApiKey(key: str, name: str, placement: str)`**: For API key authentication.
-    -   `placement` can be `'header'` or `'query'`.
--   **`Auth.BearerAuth(token: str)`**: For Bearer token authentication.
-
-**Example with `mapigen.Auth` convenience helpers:**
 ```python
-from mapigen import Mapi, Auth
-
-# For an API that uses a Bearer token
-github_auth = Auth.BearerAuth(token="YOUR_GITHUB_TOKEN")
-github_mapi = Mapi(auth=github_auth)
+class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
+    service: str  # "provider/api/source"
+    operation: str  # operation identifier
+    duration_ms: int  # Mapi SDK operations only (prep + parse)
+    network_duration_ms: Optional[int]  # HTTP roundtrip latency over the wire
+    status: Literal["success", "error"]
+    http_status: Optional[int]  # HTTP status code (200, 404, etc.)
+    timestamp: str  # ISO 8601 UTC timestamp
+    error_type: Optional[str]  # Error class name if failed
+    error_category: Optional[str]  # "validation", "transport", "system"
 ```
 
-### 2.5. Error Handling
+---
 
-All exceptions raised by the `mapigen` library are subclasses of `MapiError`. This allows for targeted error handling.
+## 4. Performance & Runtime Complexity
 
--   **`mapigen.MapiError`**: The base exception class.
-    -   `service` (`str`): The service that was called.
-    -   `operation` (`str`): The operation that was called.
-    -   `error_type` (`str`): The category of error (e.g., `"validation"`, `"network_error"`, `"sdk"`).
-
-**Example:**
-```python
-from mapigen import Mapi, MapiError
-
-mapi = Mapi()
-
-try:
-    # This will fail validation because 'id' is missing
-    mapi.pokeapi.api_v2_pokemon_retrieve()
-except MapiError as e:
-    print(f"Caught a MapiError!")
-    print(f"  Service: {e.service}")
-    print(f"  Operation: {e.operation}")
-    print(f"  Error Type: {e.error_type}")
-    print(f"  Message: {e}")
-```
-
-## 3. Core Data Models
-
-These are the primary data structures returned by the client's methods.
-
--   **`ResponseMetadata`**: Returned in the `metadata` key of every `execute` call.
-    -   `service` (`str`): The name of the service.
-    -   `operation` (`str`): The name of the operation.
-    -   `duration_ms` (`int`): The duration of the API call in milliseconds.
-    -   `status` (`str`): `"success"` or `"error"`.
-    -   `http_status` (`Optional[int]`): The HTTP status code of the response.
-    -   `error_type` (`Optional[str]`): The category of error if one occurred.
-
--   **`ServiceInfo`**: Returned by `discovery.get_service_info()`.
-    -   `operation_count` (`int`): Total number of operations.
-    -   `popularity_rank` (`int`): The service's rank.
-    -   `auth_types` (`List[str]`): A list of supported authentication types.
-    -   `primary_auth` (`str`): The main authentication type.
-
--   **`Operation`**: Returned by `discovery.get_operation()`.
-    -   `service` (`str`): The service name.
-    -   `path` (`str`): The URL path for the operation.
-    -   `method` (`str`): The HTTP method (e.g., `"GET"`, `"POST"`).
-    -   `parameters` (`List[ParameterUnion]`): A list of parameters for the operation.
-
-## 4. Complexity and Runtime
-
-This section provides an overview of the computational complexity and runtime characteristics of key operations in the `mapigen` library. This information is useful for understanding the performance implications of using the library in different scenarios.
-
-The complexities are expressed in Big O notation, where:
--   `N`: Represents the size of the input data (e.g., an API specification file).
--   `S`: Represents the number of services.
--   `P`: Represents the number of parameters in an operation.
--   `R`: Represents the size of the request/response payload.
--   `M`: Represents the size of the metadata for a service.
--   `K`: Represents the number of pinned keys in the cache.
-
-#### Client Operations (`mapigen.client`)
-
-| Method/Operation | Time Complexity | Space Complexity | Runtime Specs | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| `Mapi.__init__` | `O(S)` | `O(S)` | - | Initialization involves loading the service registry. |
-| `Mapi.__getattribute__` | `O(1)` | `O(1)` | - | Accessing a service proxy is a constant time operation. |
-| `Mapi._load_service_data` | `O(N)` | `O(N)` | File I/O, Decompression | Loading a service definition from disk is linear to its size. |
-| `Mapi.execute` / `aexecute` | `O(P + R)` | `O(P + R)` | Network | Dominated by parameter preparation and network latency. |
-
-#### Discovery Operations (`mapigen.discovery`)
-
-| Method/Operation | Time Complexity | Space Complexity | Runtime Specs | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| `list_services` | `O(1)` (cached) | `O(1)` | File I/O (first call) | The service registry is cached after the first read. |
-| `get_service_info` | `O(1)` (cached) | `O(1)` | File I/O (first call) | The service registry is cached after the first read. |
-| `list_operations` | `O(N)` | `O(N)` | File I/O, Decompression | Requires loading the service data from disk. |
-| `get_operation` | `O(N)` | `O(N)` | File I/O, Decompression | Requires loading the service data from disk. |
-
-#### Caching (`mapigen.cache`)
-
-| Method/Operation | Time Complexity | Space Complexity | Runtime Specs | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| `PinnedLRUCache.get` | `O(1)` (amortized) | `O(M+K)` | Threading | Cache hits are constant time. Misses trigger a disk load. |
-
-## 5. Appendix: Internal Architecture
-
-This section provides a high-level overview of the internal components of `mapigen`.
-
--   **`metadata`**: This package is the core of the data processing pipeline. It contains modules for:
-    -   `fetcher`: Downloads OpenAPI specifications from remote URLs.
-    -   `converter`: Normalizes and validates raw specs.
-    -   `extractor`: Reduces the spec into the lightweight `utilize.json` format, fingerprinting and componentizing reusable parameters.
-
--   **`cache`**: Manages the storage and retrieval of processed service data.
-    -   `storage.py`: Handles loading service data from disk (either compressed or uncompressed) and implements the `PinnedLRUCache` for efficient in-memory caching.
-    -   `ranking.py`: Manages the popularity ranking of services, which determines whether they are compressed.
-
--   **`tools`**: A collection of developer-facing scripts for managing the data pipeline.
-    -   `populate_data.py`: The main script that orchestrates the entire fetch -> process -> store workflow.
-    -   `validate_data.py` & `deep_validate.py`: Scripts for ensuring the integrity and correctness of the processed data.
-
--   **`proxy`**: Contains the `ServiceProxy` and `OperationProxy` classes that enable the dynamic `mapi.service.operation()` syntax.
-
--   **`http`**: A simple transport layer built on `niquests` that handles making synchronous and asynchronous HTTP requests.
+| Operation | Time Complexity | Space Complexity | Description |
+| :--- | :--- | :--- | :--- |
+| `Mapi.__init__` | $O(1)$ | $O(1)$ | Lazy loading; registry decoded on first access. |
+| `client.<provider>.<api>` | $O(1)$ | $O(1)$ | Light `__slots__` proxy construction without heap allocation. |
+| `ServiceCache.get` | $O(1)$ amortized | $O(S)$ | Native 3-tuple hash lookup; fast-path for pinned services. |
+| `ParameterValidator.validate` | $O(P)$ | $O(1)$ | Uses compiled C Structs cached per operation. |
+| `execute` / `aexecute` | $O(P + R)$ | $O(R)$ | Parameter preparation + direct C decoding via `msgspec`. |

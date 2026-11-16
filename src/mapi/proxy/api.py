@@ -33,15 +33,33 @@ class ApiProxy:
         self._api = api
         self._source = source
 
-    def __call__(self, operation: str, **kwargs: Any) -> MapiResult:
+    def __call__(
+        self,
+        operation: str,
+        *,
+        _type: Any = None,
+        _raw: bool = False,
+        **kwargs: Any,
+    ) -> MapiResult:
         """Execute an API operation synchronously."""
         source = self._resolve_source()
-        return self._client.execute(self._provider, self._api, source, operation, **kwargs)
+        return self._client.execute(
+            self._provider, self._api, source, operation, _type=_type, _raw=_raw, **kwargs
+        )
 
-    async def aexecute(self, operation: str, **kwargs: Any) -> MapiResult:
+    async def aexecute(
+        self,
+        operation: str,
+        *,
+        _type: Any = None,
+        _raw: bool = False,
+        **kwargs: Any,
+    ) -> MapiResult:
         """Execute an API operation asynchronously."""
         source = self._resolve_source()
-        return await self._client.aexecute(self._provider, self._api, source, operation, **kwargs)
+        return await self._client.aexecute(
+            self._provider, self._api, source, operation, _type=_type, _raw=_raw, **kwargs
+        )
 
     def __getattr__(self, source_name: str) -> ApiProxy:
         """Return a new ApiProxy scoped to the specified source."""
