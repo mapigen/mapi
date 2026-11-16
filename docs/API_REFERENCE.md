@@ -170,14 +170,57 @@ class ResponseMetadata(msgspec.Struct, frozen=True, gc=False):
     network_duration_ms: Optional[int]  # HTTP roundtrip latency over the wire
     status: Literal["success", "error"]
     http_status: Optional[int]  # HTTP status code (200, 404, etc.)
+    headers: HeadersDict  # Case-insensitive response headers dictionary
     timestamp: str  # ISO 8601 UTC timestamp
     error_type: Optional[str]  # Error class name if failed
     error_category: Optional[str]  # "validation", "transport", "system"
+
+    # Convenience Header Properties:
+    @property
+    def content_type(self) -> Optional[str]: ...
+
+    @property
+    def etag(self) -> Optional[str]: ...
+
+    @property
+    def retry_after(self) -> Optional[float]: ...
+
+    @property
+    def rate_limit_limit(self) -> Optional[int]: ...
+
+    @property
+    def rate_limit_remaining(self) -> Optional[int]: ...
+
+    @property
+    def rate_limit_reset(self) -> Optional[int]: ...
 ```
 
 ---
 
-## 4. Performance & Runtime Complexity
+## 4. Client Configuration & Server Selection
+
+```python
+class ClientConfig(msgspec.Struct, frozen=True, gc=False):
+    base_url: Optional[str] = None
+    default_timeout: float = 30.0
+    validate_on_execute: bool = True
+    pinned_services: tuple[str, ...] = ()
+    cache_maxsize: int = 64
+    log_level: str = "INFO"
+    multiplexed: bool = True
+    retries: int = 0
+    server_variables: dict[str, str] = msgspec.field(default_factory=dict)
+    default_headers: dict[str, str] = msgspec.field(default_factory=_default_headers)
+    server_pattern: Optional[str] = None
+    server_tag: Optional[str] = None
+```
+
+* **Additive Default Headers**: `ClientConfig(default_headers={"X-Custom": "123"})` automatically preserves standard `User-Agent: mapi/0.1.0` and `Accept: application/json` while appending custom headers.
+* **Server Environment Matching**: Set `server_tag="sandbox"` or `server_pattern="eu.example.com"` to automatically match target OpenAPI server blocks by description or URL substring.
+
+---
+
+## 5. Performance & Runtime Complexity
 
 | Operation | Time Complexity | Space Complexity | Description |
 | :--- | :--- | :--- | :--- |

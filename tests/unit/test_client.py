@@ -287,3 +287,142 @@ class TestMapiContextManager:
         assert cfg.multiplexed is True
         assert cfg.retries == 0
         assert cfg.server_variables == {}
+        assert cfg.default_headers == {"User-Agent": "mapi/0.1.0", "Accept": "application/json"}
+
+    def test_default_headers_additive_and_overrides(self, sample_service_data):
+        from mapi.client.request_builder import RequestBuilder
+
+        cache = MagicMock()
+        cache.get.return_value = sample_service_data
+        builder = RequestBuilder(cache)
+
+        # 1. Base defaults applied
+        c1 = builder.build("mock_service", "REST", "openapi", "get_user", user_id=1)
+        assert c1.headers.get("User-Agent") == "mapi/0.1.0"
+        assert c1.headers.get("Accept") == "application/json"
+
+        # 2. Additive user headers
+        c2 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=1,
+            default_headers={"X-Custom-Tenant": "tenant-abc"},
+        )
+        assert c2.headers.get("User-Agent") == "mapi/0.1.0"
+        assert c2.headers.get("Accept") == "application/json"
+        assert c2.headers.get("X-Custom-Tenant") == "tenant-abc"
+
+        # 3. User can override standard default header
+        c3 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=1,
+            default_headers={"User-Agent": "custom-agent/2.0"},
+        )
+        assert c3.headers.get("User-Agent") == "custom-agent/2.0"
+        assert c3.headers.get("Accept") == "application/json"
+
+    def test_server_tag_and_pattern_selection(self, sample_service_data):
+        from mapi.client.request_builder import RequestBuilder
+
+        sample_service_data = msgspec.structs.replace(
+            sample_service_data,
+            servers=[
+                Server(url="https://api.example.com/v1", description="Production"),
+                Server(url="https://sandbox.example.com/v1", description="Sandbox Environment"),
+                Server(url="https://eu.example.com/v1", description="European Union DC"),
+            ],
+        )
+        cache = MagicMock()
+        cache.get.return_value = sample_service_data
+        builder = RequestBuilder(cache)
+
+        # Default picks first server
+        c0 = builder.build("mock_service", "REST", "openapi", "get_user", user_id=1)
+        assert c0.url == "https://api.example.com/v1/users/1"
+
+        # Match by description tag
+        c1 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=1,
+            server_tag="sandbox",
+        )
+        assert c1.url == "https://sandbox.example.com/v1/users/1"
+
+        # Match by URL pattern
+        c2 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=1,
+            server_pattern="eu.example.com",
+        )
+        assert c2.url == "https://eu.example.com/v1/users/1"
+
+        # Fallback to first if pattern unmatched
+        c3 = builder.build(
+            "mock_service",
+            "REST",
+            "openapi",
+            "get_user",
+            user_id=1,
+            server_tag="nonexistent",
+        )
+        assert c3.url == "https://api.example.com/v1/users/1"
+
+    def test_response_metadata_convenience_properties(self):
+        from mapi.models.response import HeadersDict, ResponseMetadata
+
+        raw = {
+            "Content-Type": "application/json; charset=utf-8",
+            "ETag": '"33a64df551425fcc55e4d42a148795d9f25f89d4"',
+            "Retry-After": "120",
+            "X-RateLimit-Limit": "5000",
+            "X-RateLimit-Remaining": "4995",
+            "X-RateLimit-Reset": "1731776400",
+        }
+        headers = HeadersDict(raw)
+        meta = ResponseMetadata(
+            service="test",
+            operation="test_op",
+            duration_ms=5,
+            status="success",
+            headers=headers,
+        )
+
+        assert meta.content_type == "application/json; charset=utf-8"
+        assert meta.etag == '"33a64df551425fcc55e4d42a148795d9f25f89d4"'
+        assert meta.retry_after == 120.0
+        assert meta.rate_limit_limit == 5000
+        assert meta.rate_limit_remaining == 4995
+        assert meta.rate_limit_reset == 1731776400
+
+        # Case-insensitive dict lookups
+        assert headers["content-type"] == headers["Content-Type"]
+        assert headers.get("etag") == headers.get("ETag")
+        assert "x-ratelimit-remaining" in headers
+        assert "X-RateLimit-Remaining" in headers
+
+    def test_discovery_uses_cache(self, sample_service_data):
+        from mapi.registry.discovery import DiscoveryService
+
+        rm = MagicMock()
+        loader = MagicMock()
+        cache = MagicMock()
+        cache.get.return_value = sample_service_data
+
+        discovery = DiscoveryService(rm, loader, cache=cache)
+        discovery._resolve_source = MagicMock(return_value="openapi")
+
+        ops = discovery.list_operations("mock", "api", "openapi")
+        assert "get_user" in ops
+        cache.get.assert_called_once_with("mock", "api", "openapi")
+        loader.load_service.assert_not_called()

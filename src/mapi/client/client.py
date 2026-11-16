@@ -24,7 +24,7 @@ from ..exceptions import (
 )
 from ..models.config import ClientConfig
 from ..models.request import BatchRequest, RequestConfig
-from ..models.response import MapiResult, ResponseMetadata
+from ..models.response import HeadersDict, MapiResult, ResponseMetadata
 from ..proxy.provider import ProviderProxy
 from ..registry.discovery import DiscoveryService, RegistryManager
 from ..registry.loader import DiskLoader
@@ -153,6 +153,9 @@ class Mapi:
                 multiplexed=cfg.multiplexed,
                 retries=cfg.retries,
                 server_variables=cfg.server_variables,
+                default_headers=cfg.default_headers,
+                server_pattern=cfg.server_pattern,
+                server_tag=cfg.server_tag,
             )
 
         if isinstance(auth, str):
@@ -161,12 +164,12 @@ class Mapi:
 
         self._loader = DiskLoader(data_dir=data_dir, registry_path=registry_path)
         self._registry_mgr = RegistryManager(self._loader)
-        self._discovery = DiscoveryService(self._registry_mgr, self._loader)
         self._cache = ServiceCache(
             self._loader,
             pinned_keys=frozenset(cfg.pinned_services),
             maxsize=cfg.cache_maxsize,
         )
+        self._discovery = DiscoveryService(self._registry_mgr, self._loader, cache=self._cache)
         validator = ParameterValidator(self._cache) if cfg.validate_on_execute else None
         self._builder = RequestBuilder(self._cache, validator)
         transport_kwargs.setdefault("multiplexed", cfg.multiplexed)
@@ -204,6 +207,9 @@ class Mapi:
             operation,
             base_url=self._config.base_url,
             server_variables=self._config.server_variables,
+            default_headers=self._config.default_headers,
+            server_pattern=self._config.server_pattern,
+            server_tag=self._config.server_tag,
             timeout=self._config.default_timeout,
             **kwargs,
         )
@@ -270,7 +276,9 @@ class Mapi:
             response, net_time = _measure(self._transport.request, config, auth=self._auth)
             data, post_time = _measure(self._decode_response, response, target_type, raw)
             raw_headers = getattr(response, "headers", None)
-            resp_headers = dict(raw_headers) if isinstance(raw_headers, Mapping) else {}
+            resp_headers = (
+                HeadersDict(raw_headers) if isinstance(raw_headers, Mapping) else HeadersDict()
+            )
             return _build_result(
                 service_name,
                 operation,
@@ -307,7 +315,9 @@ class Mapi:
             response, net_time = await _ameasure(self._transport.arequest(config, auth=self._auth))
             data, post_time = _measure(self._decode_response, response, target_type, raw)
             raw_headers = getattr(response, "headers", None)
-            resp_headers = dict(raw_headers) if isinstance(raw_headers, Mapping) else {}
+            resp_headers = (
+                HeadersDict(raw_headers) if isinstance(raw_headers, Mapping) else HeadersDict()
+            )
             return _build_result(
                 service_name,
                 operation,
@@ -361,11 +371,13 @@ class Mapi:
         return list(await asyncio.gather(*tasks, return_exceptions=return_exceptions))
 
     def clear_cache(self) -> None:
-        """Flush the in-memory service definitions cache, typed decoders, and validator structs."""
+        """Flush the in-memory service definitions cache, typed decoders, validator structs, and path cache."""
         self._cache.clear()
+        if hasattr(self, "_loader") and hasattr(self._loader, "clear_cache"):
+            self._loader.clear_cache()
         if hasattr(self, "_typed_decoders"):
             self._typed_decoders.clear()
-        if self._builder._validator is not None:
+        if hasattr(self, "_builder") and self._builder._validator is not None:
             self._builder._validator.clear_cache()
 
     # --- Context Managers ---

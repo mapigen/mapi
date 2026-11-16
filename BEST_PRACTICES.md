@@ -84,20 +84,47 @@ The `mapi` core architecture is built upon two high-performance libraries. Refer
   client.provider.api("create_item", item=ItemStruct(name="Widget"))
   ```
 
-### 2.5 Strongly-Typed Return Models (`_type=MyStruct`)
-* Callers can direct the SDK to deserialize and validate responses directly into a user-defined `msgspec.Struct` or dataclass at C-speed:
+### 2.8 Headers Telemetry & Case-Insensitive `HeadersDict`
+* Response headers are encapsulated in `HeadersDict`, a specialized `dict[str, str]` subclass that preserves original server casing while enabling $O(1)$ case-insensitive access:
   ```python
-  class Pokemon(msgspec.Struct):
-      id: int
-      name: str
-
-
-  result = client.pokeapi.REST("pokemon_retrieve", id="ditto", _type=Pokemon)
-  assert isinstance(result.data, Pokemon)
+  result = client.pokeapi.REST("pokemon_retrieve", id="ditto")
+  # Access via exact or case-insensitive keys:
+  assert result.metadata.headers["content-type"] == result.metadata.headers["Content-Type"]
+  # Convenience properties for common headers:
+  print(result.metadata.content_type)
+  print(result.metadata.etag)
+  print(result.metadata.retry_after)
+  print(result.metadata.rate_limit_remaining)
   ```
-* The client caches typed `msgspec.json.Decoder(target_type)` instances in `self._typed_decoders` to avoid schema re-parsing across repeated calls.
 
-### 2.6 Deferred Parsing via `msgspec.Raw` (`_raw=True`)
+---
+
+## 3. Client Configuration & Server Selection Guidelines
+
+### 3.1 Additive Default Request Headers
+* `ClientConfig.default_headers` supplies global headers (defaulting to `{"User-Agent": "mapi/0.1.0", "Accept": "application/json"}`).
+* User-provided headers are **additive** with standard defaults:
+  ```python
+  client = Mapi(config=ClientConfig(default_headers={"X-Organization-ID": "org_123"}))
+  # Sends User-Agent, Accept, and X-Organization-ID.
+  ```
+
+### 3.2 Dynamic Server Environment Selection
+* When OpenAPI schemas expose multiple servers (e.g. Production vs. Sandbox vs. Regional), select destinations by URL pattern or description tag:
+  ```python
+  # Globally in configuration:
+  client = Mapi(config=ClientConfig(server_tag="sandbox"))
+
+  # Or per-operation override:
+  result = client.stripe.charges.create(..., server_tag="sandbox")
+  ```
+
+### 3.3 Registry, Caching & Decompression Optimizations
+* **Discovery Cache Sharing**: `DiscoveryService` reuses `ServiceCache` to eliminate redundant disk reads and zstandard decompression when listing or validating operations.
+* **DiskLoader Path Cache**: `DiskLoader` caches resolved service file paths, skipping repeated `stat()` filesystem syscalls.
+* **Binary Serialization Readiness**: `DiskLoader` natively supports binary MessagePack (`.utilize.msgpack.zst`), yielding 2x–4x faster deserialization than JSON.
+
+---
 * For large response payloads, proxies, or file-dumping pipelines where full deserialization into Python dictionaries is unnecessary, pass `_raw=True` or `raw=True`:
   ```python
   result = client.pokeapi.REST("pokemon_retrieve", id="ditto", _raw=True)
@@ -219,5 +246,5 @@ Live profiling benchmarks measured with `cProfile` over 1,000 operations (`tests
 | **Peak Execution Throughput** | 14,792 ops/sec | **40,478 ops/sec** | **+173.6% ops/sec** |
 | **Total Function Calls (1,000 ops)** | 277,000 calls | **79,003 calls** | **71.5% fewer calls** |
 | **Parameter Validation Time** | ~26 ms | **~1 ms** | **26x faster** |
-| **Test Suite Execution (149 tests)** | ~1.5 s | **0.26 s** (108 passed, 41 skipped) | **~5.7x faster test run** |
+| **Test Suite Execution (158 tests)** | ~1.5 s | **0.28 s** (117 passed, 41 skipped) | **~5.4x faster test run** |
 | **Linter / Type-Checker Status** | Untracked | **0 errors, 0 warnings** | Full strict compliance |

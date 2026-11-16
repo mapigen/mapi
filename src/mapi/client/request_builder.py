@@ -37,6 +37,9 @@ class RequestBuilder:
         *,
         base_url: str | None = None,
         server_variables: dict[str, str] | None = None,
+        default_headers: dict[str, str] | None = None,
+        server_pattern: str | None = None,
+        server_tag: str | None = None,
         timeout: float = 30.0,
         **kwargs: Any,
     ) -> RequestConfig:
@@ -58,11 +61,26 @@ class RequestBuilder:
                 provider, api, source, operation, kwargs, service_data=service_data, op_details=op
             )
 
-        # 3. Resolve base URL and templated server variables
+        # 3. Resolve server by tag/pattern or fallback
+        effective_tag = (
+            kwargs.pop("server_tag", None)
+            or kwargs.pop("server_pattern", None)
+            or server_tag
+            or server_pattern
+        )
+
         if base_url:
             resolved_base_url = base_url
         elif service_data.servers:
             server = service_data.servers[0]
+            if effective_tag:
+                tag_lower = str(effective_tag).lower()
+                for s in service_data.servers:
+                    if tag_lower in s.url.lower() or (
+                        s.description and tag_lower in s.description.lower()
+                    ):
+                        server = s
+                        break
             url = server.url
             if "{" in url and "}" in url and server.variables:
                 vars_map: dict[str, str] = {}
@@ -92,7 +110,12 @@ class RequestBuilder:
         path_params: dict[str, Any] = {}
         query_params: dict[str, Any] = {}
         body_params: dict[str, Any] = {}
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = {
+            "User-Agent": "mapi/0.1.0",
+            "Accept": "application/json",
+        }
+        if default_headers:
+            headers.update(default_headers)
 
         for param_union in op.parameters:
             if isinstance(param_union, ParameterRef):

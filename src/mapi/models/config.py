@@ -6,6 +6,10 @@ import os
 import msgspec
 
 
+def _default_headers() -> dict[str, str]:
+    return {"User-Agent": "mapi/0.1.0", "Accept": "application/json"}
+
+
 class ClientConfig(msgspec.Struct, frozen=True, gc=False):
     """Immutable client configuration."""
 
@@ -18,10 +22,14 @@ class ClientConfig(msgspec.Struct, frozen=True, gc=False):
     multiplexed: bool = True
     retries: int = 0
     server_variables: dict[str, str] = msgspec.field(default_factory=dict)
+    default_headers: dict[str, str] = msgspec.field(default_factory=_default_headers)
+    server_pattern: str | None = None
+    server_tag: str | None = None
 
     @classmethod
     def from_env(cls) -> ClientConfig:
         """Create config from environment variables (MAPI_* prefix)."""
+        server_tag = os.environ.get("MAPI_SERVER_TAG") or os.environ.get("MAPI_SERVER_PATTERN")
         return cls(
             cache_maxsize=int(os.environ.get("MAPI_CACHE_MAXSIZE", 64)),
             pinned_services=tuple(
@@ -29,4 +37,6 @@ class ClientConfig(msgspec.Struct, frozen=True, gc=False):
                 for s in os.environ.get("MAPI_PINNED_SERVICES", "").split(",")
                 if s.strip()
             ),
+            server_tag=server_tag,
+            server_pattern=server_tag,
         )

@@ -12,7 +12,7 @@ from .domain import (
 )
 from .registry import ApiInfo, MetadataFile, ServiceRegistry
 from .request import BatchRequest, RequestConfig
-from .response import MapiResult, ResponseMetadata
+from .response import HeadersDict, MapiResult, ResponseMetadata
 
 __all__ = [
     "Parameter",
@@ -31,5 +31,6 @@ __all__ = [
     "ClientConfig",
     "RequestConfig",
     "ResponseMetadata",
+    "HeadersDict",
     "MapiResult",
 ]

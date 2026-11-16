@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
 from ..exceptions import ServiceNotFoundError
-from ..models.domain import Operation
+from ..models.domain import Operation, ServiceData
 from ..models.registry import ApiInfo, ServiceRegistry
 from .loader import DiskLoader
+
+if TYPE_CHECKING:
+    from ..cache.service_cache import ServiceCache
 
 log = logging.getLogger(__name__)
 
@@ -44,9 +48,20 @@ class DiscoveryService:
     lru_cache) with an injectable, testable service.
     """
 
-    def __init__(self, registry_manager: RegistryManager, loader: DiskLoader) -> None:
+    def __init__(
+        self,
+        registry_manager: RegistryManager,
+        loader: DiskLoader,
+        cache: ServiceCache | None = None,
+    ) -> None:
         self._rm = registry_manager
         self._loader = loader
+        self._cache = cache
+
+    def _get_service_data(self, provider: str, api: str, source: str) -> ServiceData:
+        if self._cache is not None:
+            return self._cache.get(provider, api, source)
+        return self._loader.load_service(provider, api, source)
 
     # --- Provider level ---
 
@@ -91,7 +106,7 @@ class DiscoveryService:
     def list_operations(self, provider: str, api: str, source: str | None = None) -> list[str]:
         src = self._resolve_source(provider, api, source)
         try:
-            sd = self._loader.load_service(provider, api, src)
+            sd = self._get_service_data(provider, api, src)
             return list(sd.operations.keys())
         except ServiceNotFoundError:
             return []
@@ -101,7 +116,7 @@ class DiscoveryService:
     ) -> bool:
         src = self._resolve_source(provider, api, source)
         try:
-            sd = self._loader.load_service(provider, api, src)
+            sd = self._get_service_data(provider, api, src)
             return operation in sd.operations
         except ServiceNotFoundError:
             return False
@@ -110,7 +125,7 @@ class DiscoveryService:
         self, provider: str, api: str, operation: str, source: str | None = None
     ) -> Operation:
         src = self._resolve_source(provider, api, source)
-        sd = self._loader.load_service(provider, api, src)
+        sd = self._get_service_data(provider, api, src)
         op = sd.operations.get(operation)
         if op is None:
             raise ServiceNotFoundError(

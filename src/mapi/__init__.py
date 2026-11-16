@@ -14,7 +14,7 @@ from .exceptions import (
 )
 from .models.config import ClientConfig
 from .models.request import BatchRequest
-from .models.response import MapiResult, ResponseMetadata
+from .models.response import HeadersDict, MapiResult, ResponseMetadata
 
 __version__ = "0.1.0"
 
@@ -25,6 +25,7 @@ __all__ = [
     "ClientConfig",
     "ClientError",
     "ConfigurationError",
+    "HeadersDict",
     "Mapi",
     "MapiError",
     "MapiResult",

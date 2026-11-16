@@ -66,6 +66,26 @@ class TestDiskLoader:
         with pytest.raises(ServiceNotFoundError, match="not found"):
             loader.load_service("nonexistent", "api", "src")
 
+    def test_path_caching_and_clear_cache(self, tmp_path, sample_service_data):
+        target = _write_service_data(
+            tmp_path, "pokemon", "REST", "v2", sample_service_data, compressed=True
+        )
+        loader = DiskLoader(data_dir=tmp_path, registry_path=tmp_path / "s.json")
+        assert len(loader._path_cache) == 0
+
+        # First load populates cache
+        loader.load_service("pokemon", "REST", "v2")
+        key = ("pokemon", "REST", "v2")
+        assert key in loader._path_cache
+        path, is_compressed, is_msgpack = loader._path_cache[key]
+        assert path == target
+        assert is_compressed is True
+        assert is_msgpack is False
+
+        # Clear cache empties path cache
+        loader.clear_cache()
+        assert len(loader._path_cache) == 0
+
 
 class TestRegistryManager:
     def test_lazy_loading(self, sample_registry):

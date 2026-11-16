@@ -45,7 +45,9 @@ class DiskLoader:
         self.registry_path = registry_path or _default_registry_path()
         self._dctx = zstd.ZstdDecompressor()
         self._service_decoder = msgspec.json.Decoder(ServiceData)
+        self._service_msgpack_decoder = msgspec.msgpack.Decoder(ServiceData)
         self._registry_decoder = msgspec.json.Decoder(ServiceRegistry)
+        self._path_cache: dict[tuple[str, str, str], tuple[Path, bool, bool]] = {}
 
     def load_registry(self) -> ServiceRegistry:
         """Load and decode services.json into a typed ServiceRegistry."""
@@ -58,23 +60,47 @@ class DiskLoader:
         return self._registry_decoder.decode(self.registry_path.read_bytes())
 
     def load_service(self, provider: str, api: str, source: str) -> ServiceData:
-        """Load utilize.json or utilize.json.zst for a service."""
+        """Load utilize.json, utilize.msgpack, or .zst for a service."""
+        key = (provider, api, source)
+        if key in self._path_cache:
+            path, is_compressed, is_msgpack = self._path_cache[key]
+            raw = path.read_bytes()
+            content = self._dctx.decompress(raw) if is_compressed else raw
+            if is_msgpack:
+                return self._service_msgpack_decoder.decode(content)
+            return self._service_decoder.decode(content)
+
         service_dir = self.service_dir(provider, api, source)
-        uncompressed = service_dir / f"{api}.utilize.json"
-        compressed = service_dir / f"{api}.utilize.json.zst"
-
-        if uncompressed.exists():
-            log.debug("Loading uncompressed %s/%s/%s", provider, api, source)
-            return self._service_decoder.decode(uncompressed.read_bytes())
-
-        if compressed.exists():
-            log.debug("Loading compressed %s/%s/%s", provider, api, source)
-            return self._service_decoder.decode(self._dctx.decompress(compressed.read_bytes()))
+        candidates = (
+            (service_dir / f"{api}.utilize.msgpack.zst", True, True),
+            (service_dir / f"{api}.utilize.msgpack", False, True),
+            (service_dir / f"{api}.utilize.json.zst", True, False),
+            (service_dir / f"{api}.utilize.json", False, False),
+        )
+        for path, is_compressed, is_msgpack in candidates:
+            if path.exists():
+                self._path_cache[key] = (path, is_compressed, is_msgpack)
+                log.debug(
+                    "Loading %s %s/%s/%s",
+                    "compressed" if is_compressed else "uncompressed",
+                    provider,
+                    api,
+                    source,
+                )
+                raw = path.read_bytes()
+                content = self._dctx.decompress(raw) if is_compressed else raw
+                if is_msgpack:
+                    return self._service_msgpack_decoder.decode(content)
+                return self._service_decoder.decode(content)
 
         raise ServiceNotFoundError(
             f"Service data for '{provider}/{api}/{source}' not found. Expected at {service_dir}",
             service=f"{provider}/{api}/{source}",
         )
+
+    def clear_cache(self) -> None:
+        """Clear resolved service path cache."""
+        self._path_cache.clear()
 
     def service_dir(self, provider: str, api: str, source: str) -> Path:
         """Return the directory path for a given service."""
