@@ -1,6 +1,7 @@
 # src/mapi/client/client.py
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import AsyncIterator, Iterator, Sequence
 from pathlib import Path
@@ -94,9 +95,30 @@ class Mapi:
             online=online,
         )
         self._registry_mgr = RegistryManager(self._loader)
+        pinned_keys = set(cfg.pinned_services)
+        if not pinned_keys:
+            # Bootstrap cache: auto-pin top popular services (rank <= 3)
+            # Rule of thumb: respect local storage ranks over registry defaults
+            try:
+                reg = self._registry_mgr.registry
+                for p, apis in reg.providers.items():
+                    for a, info in apis.items():
+                        eff_rank = info.popularity_rank
+                        for src in info.sources:
+                            meta = self._loader.load_service_metadata(p, a, src)
+                            if meta and "popularity_rank" in meta:
+                                with contextlib.suppress(ValueError, TypeError):
+                                    eff_rank = int(meta["popularity_rank"])
+                                break
+                        if eff_rank <= 3:
+                            for src in info.sources:
+                                pinned_keys.add(f"{p}:{a}:{src}")
+            except Exception as e:
+                log.debug("Cache bootstrap skipped or failed: %s", e)
+
         self._cache = ServiceCache(
             self._loader,
-            pinned_keys=frozenset(cfg.pinned_services),
+            pinned_keys=frozenset(pinned_keys),
             maxsize=cfg.cache_maxsize,
         )
         self._discovery = DiscoveryService(self._registry_mgr, self._loader, cache=self._cache)
@@ -149,6 +171,11 @@ class Mapi:
     def discovery(self) -> DiscoveryService:
         """Access discovery services (providers, APIs, operations)."""
         return self._discovery
+
+    @property
+    def pinned_services(self) -> frozenset[str]:
+        """Access the set of service keys pinned in memory cache."""
+        return getattr(self._cache, "_pinned_keys", frozenset())
 
     def _prepare_request(
         self,

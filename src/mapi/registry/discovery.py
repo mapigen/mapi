@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+import msgspec
 
 from ..exceptions import ServiceNotFoundError
 from ..models.domain import Operation, ServiceData
@@ -55,6 +58,40 @@ class DiscoveryService:
             return self._cache.get(provider, api, source)
         return self._loader.load_service(provider, api, source)
 
+    def _get_local_popularity_rank(
+        self, provider: str, api: str, sources: list[str]
+    ) -> int | None:
+        """Check local storage (metadata.yml or popularity.json) for existing popularity rank.
+
+        Rule of thumb: Local storage ranks take absolute precedence over registry defaults.
+        """
+        data_dir = getattr(self._loader, "data_dir", None)
+        if isinstance(data_dir, Path) and data_dir.is_dir():
+            pop_file = data_dir / "popularity.json"
+            if pop_file.is_file():
+                try:
+                    import json
+
+                    pop_map = json.loads(pop_file.read_text(encoding="utf-8"))
+                    key_full = f"{provider}/{api}"
+                    if key_full in pop_map:
+                        return int(pop_map[key_full])
+                    if provider in pop_map:
+                        return int(pop_map[provider])
+                except Exception:
+                    pass
+
+        load_meta = getattr(self._loader, "load_service_metadata", None)
+        if callable(load_meta):
+            for src in sources:
+                meta = load_meta(provider, api, src)
+                if isinstance(meta, dict) and "popularity_rank" in meta:
+                    try:
+                        return int(meta["popularity_rank"])
+                    except (ValueError, TypeError):
+                        pass
+        return None
+
     # --- Provider level ---
 
     def list_providers(self) -> list[str]:
@@ -80,6 +117,9 @@ class DiscoveryService:
                 f"API '{api}' not found for provider '{provider}'",
                 service=f"{provider}/{api}",
             )
+        local_rank = self._get_local_popularity_rank(provider, api, api_info.sources)
+        if local_rank is not None and local_rank != api_info.popularity_rank:
+            return msgspec.structs.replace(api_info, popularity_rank=local_rank)
         return api_info
 
     def _resolve_source(self, provider: str, api: str, source: str | None) -> str:

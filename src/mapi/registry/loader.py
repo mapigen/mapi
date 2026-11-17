@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import msgspec
 import zstandard as zstd
@@ -33,13 +34,30 @@ _PRIMARY_REGISTRY = _PACKAGE_DIR / PRIMARY_REGISTRY_FILENAME
 
 def _default_data_dir() -> Path:
     env = os.environ.get(ENV_MAPI_DATA_DIR)
-    return Path(env) if env else _DEFAULT_DATA_DIR
+    if env:
+        return Path(env)
+    # Check workspace data dir (prefer dedicated data/ outside of package src)
+    current = Path.cwd().resolve()
+    for parent in [current, *current.parents[:4]]:
+        data_sub = parent / DEFAULT_DATA_DIR_NAME
+        if data_sub.is_dir() and "src/mapi" not in str(data_sub):
+            return data_sub
+    # Check XDG / system user data dir
+    xdg_data = os.environ.get("XDG_DATA_HOME")
+    user_data = (Path(xdg_data) if xdg_data else Path.home() / ".local/share") / "mapi" / DEFAULT_DATA_DIR_NAME
+    if user_data.is_dir():
+        return user_data
+    return _DEFAULT_DATA_DIR
 
 
-def _default_registry_path() -> Path:
+def _default_registry_path(data_dir: Path | None = None) -> Path:
     env = os.environ.get(ENV_MAPI_REGISTRY_PATH)
     if env:
         return Path(env)
+    target_data = data_dir or _default_data_dir()
+    reg_in_data = target_data / PRIMARY_REGISTRY_FILENAME
+    if reg_in_data.exists():
+        return reg_in_data
     return _PRIMARY_REGISTRY
 
 
@@ -54,7 +72,7 @@ class DiskLoader:
         online: bool = False,
     ) -> None:
         self.data_dir = data_dir or _default_data_dir()
-        self.registry_path = registry_path or _default_registry_path()
+        self.registry_path = registry_path or _default_registry_path(self.data_dir)
         self.packfile_path = packfile_path
         self.online = online or os.environ.get("MAPI_ONLINE") == "1"
         self._packfile: PackfileLoader | None = None
@@ -82,6 +100,44 @@ class DiskLoader:
         log.debug("Loading registry from %s", self.registry_path)
         return self._registry_decoder.decode(self.registry_path.read_bytes())
 
+    def load_service_metadata(
+        self, provider: str, api: str, source: str
+    ) -> dict[str, Any] | None:
+        """Load metadata.yml for a service if present."""
+        service_dir = self.service_dir(provider, api, source)
+        meta_candidates = [
+            service_dir / "metadata.yml",
+            service_dir / "metadata.yaml",
+        ]
+        if self.data_dir.resolve() != _DEFAULT_DATA_DIR.resolve() and _DEFAULT_DATA_DIR.exists():
+            pkg_service_dir = _DEFAULT_DATA_DIR / provider / source / api
+            meta_candidates.extend([
+                pkg_service_dir / "metadata.yml",
+                pkg_service_dir / "metadata.yaml",
+            ])
+
+        for meta_path in meta_candidates:
+            if meta_path.is_file():
+                try:
+                    import yaml
+                    data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+                    if isinstance(data, dict):
+                        return data
+                except ImportError:
+                    result: dict[str, Any] = {}
+                    for line in meta_path.read_text(encoding="utf-8").splitlines():
+                        if ":" in line and not line.strip().startswith("-"):
+                            k, v = line.split(":", 1)
+                            k, v = k.strip(), v.strip()
+                            if v.isdigit():
+                                result[k] = int(v)
+                            else:
+                                result[k] = v
+                    return result
+                except Exception:
+                    pass
+        return None
+
     def load_service(self, provider: str, api: str, source: str) -> ServiceData:
         """Load mapi.json, mapi.msgpack, or .zst for a service."""
         if self._packfile is not None:
@@ -97,12 +153,20 @@ class DiskLoader:
             return self._service_decoder.decode(content)
 
         service_dir = self.service_dir(provider, api, source)
-        candidates = (
+        candidates = [
             (service_dir / f"{api}{MAPI_EXT_MSGPACK_ZST}", True, True),
             (service_dir / f"{api}{MAPI_EXT_MSGPACK}", False, True),
             (service_dir / f"{api}{MAPI_EXT_ZST}", True, False),
             (service_dir / f"{api}{MAPI_EXT_JSON}", False, False),
-        )
+        ]
+        if self.data_dir.resolve() != _DEFAULT_DATA_DIR.resolve() and _DEFAULT_DATA_DIR.exists():
+            pkg_service_dir = _DEFAULT_DATA_DIR / provider / source / api
+            candidates.extend([
+                (pkg_service_dir / f"{api}{MAPI_EXT_MSGPACK_ZST}", True, True),
+                (pkg_service_dir / f"{api}{MAPI_EXT_MSGPACK}", False, True),
+                (pkg_service_dir / f"{api}{MAPI_EXT_ZST}", True, False),
+                (pkg_service_dir / f"{api}{MAPI_EXT_JSON}", False, False),
+            ])
         for path, is_compressed, is_msgpack in candidates:
             if path.exists():
                 self._path_cache[key] = (path, is_compressed, is_msgpack)

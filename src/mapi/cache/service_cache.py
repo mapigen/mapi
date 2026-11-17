@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import threading
 from functools import lru_cache
 
@@ -70,6 +71,15 @@ class ServiceCache:
             self._pinned[key] = data
             if pinned and key not in self._pinned_keys:
                 self._pinned_keys = self._pinned_keys | {key}
+
+    def pin_service(self, provider: str, api: str, source: str) -> None:
+        """Promote a service to pinned status so it is never evicted from memory."""
+        key = f"{provider}:{api}:{source}"
+        with self._lock:
+            self._pinned_keys = self._pinned_keys | {key}
+            if key not in self._pinned and key in self._cached_keys:
+                with contextlib.suppress(Exception):
+                    self._pinned[key] = self._loader.load_service(provider, api, source)
 
     def clear(self) -> None:
         """Evict all cached entries."""

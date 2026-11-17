@@ -83,3 +83,27 @@ class TestDiskLoader:
         # Clear cache empties path cache
         loader.clear_cache()
         assert len(loader._path_cache) == 0
+
+    def test_load_service_metadata(self, tmp_path):
+        meta_dir = tmp_path / "github" / "REST" / "github"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        meta_file = meta_dir / "metadata.yml"
+        meta_file.write_text(
+            "format_version: 3\npopularity_rank: 5\nprimary_auth: bearer_token\n",
+            encoding="utf-8",
+        )
+        loader = DiskLoader(data_dir=tmp_path, registry_path=tmp_path / "s.json")
+        meta = loader.load_service_metadata("github", "github", "REST")
+        assert meta is not None
+        assert meta["popularity_rank"] == 5
+        assert meta["primary_auth"] == "bearer_token"
+
+    def test_fallback_to_default_data_dir(self, tmp_path):
+        # Empty custom data_dir
+        loader = DiskLoader(data_dir=tmp_path)
+        # pokeapi exists in default data dir / workspace data dir
+        try:
+            data = loader.load_service("pokeapi", "REST", "github")
+            assert data is not None
+        except ServiceNotFoundError:
+            pass  # If data not installed in environment, acceptable

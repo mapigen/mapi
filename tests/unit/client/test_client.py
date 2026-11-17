@@ -4,9 +4,11 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+import msgspec
 import pytest
 
 from mapi import ApiKeyAuth, BearerAuth, Mapi
+from mapi.models.config import ClientConfig
 from mapi.proxy.api import ApiProxy
 from mapi.proxy.provider import ProviderProxy
 from tests.unit.client.conftest import build_test_mapi
@@ -80,3 +82,18 @@ class TestMapiContextManager:
         client = build_test_mapi(sample_service_data, sample_registry)
         client.clear_cache()
         cast(MagicMock, client._cache.clear).assert_called_once()
+
+    def test_cache_bootstrapping_auto_pins_top_services(self, tmp_path, sample_registry):
+        reg_file = tmp_path / "mapi-registry.json"
+        reg_file.write_bytes(msgspec.json.encode(sample_registry))
+        client = Mapi(data_dir=tmp_path, registry_path=reg_file)
+        assert "pokeapi:REST:openapi" in client.pinned_services
+        assert "github:rest:openapi" in client.pinned_services
+        assert "github:rest:postman" in client.pinned_services
+
+    def test_explicit_pinned_services_overrides_bootstrap(self, tmp_path, sample_registry):
+        reg_file = tmp_path / "mapi-registry.json"
+        reg_file.write_bytes(msgspec.json.encode(sample_registry))
+        cfg = ClientConfig(pinned_services=("custom:api:src",))
+        client = Mapi(config=cfg, data_dir=tmp_path, registry_path=reg_file)
+        assert client.pinned_services == frozenset({"custom:api:src"})

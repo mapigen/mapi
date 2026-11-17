@@ -108,3 +108,29 @@ class TestDiscoveryService:
         assert "get_user" in ops
         cache.get.assert_called_once_with("mock", "api", "openapi")
         loader.load_service.assert_not_called()
+
+    def test_local_metadata_preserves_custom_popularity_rank(self, setup_discovery):
+        discovery, loader = setup_discovery
+        # Loader finds local metadata with custom popularity rank 77
+        loader.load_service_metadata.return_value = {"popularity_rank": 77}
+        info = discovery.get_api_info("pokeapi", "REST")
+        assert info.popularity_rank == 77
+
+    def test_local_popularity_json_preserves_custom_rank(self, tmp_path, sample_registry):
+        pop_file = tmp_path / "popularity.json"
+        pop_file.write_text('{"pokeapi": 42}', encoding="utf-8")
+        loader = MagicMock()
+        loader.data_dir = tmp_path
+        loader.load_service_metadata.return_value = None
+        rm = MagicMock()
+        rm.registry = sample_registry
+        discovery = DiscoveryService(rm, loader)
+        info = discovery.get_api_info("pokeapi", "REST")
+        assert info.popularity_rank == 42
+
+    def test_registry_default_used_when_no_local_override(self, setup_discovery):
+        discovery, loader = setup_discovery
+        loader.data_dir = None
+        loader.load_service_metadata.return_value = None
+        info = discovery.get_api_info("pokeapi", "REST")
+        assert info.popularity_rank == 1
