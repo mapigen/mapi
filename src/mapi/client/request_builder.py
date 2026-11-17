@@ -184,11 +184,14 @@ class RequestBuilder:
         clean_path = formatted_path if formatted_path.startswith("/") else f"/{formatted_path}"
         full_url = f"{resolved_base_url.rstrip('/')}{clean_path}"
 
+        explicit_body = kwargs.get("json_body")
+        final_body = explicit_body if explicit_body is not None else (body_params if body_params else None)
+
         return RequestConfig(
             method=op.method,
             url=full_url,
             params=query_params,
             headers=headers,
-            json_body=body_params if body_params else None,
+            json_body=final_body,
             timeout=timeout,
         )

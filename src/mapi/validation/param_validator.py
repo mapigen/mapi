@@ -81,6 +81,7 @@ class ParameterValidator:
             )
 
         struct_fields: list[tuple] = []
+        has_explicit_body = "json_body" in kwargs
         for param_union in op_details.parameters:
             if isinstance(param_union, ParameterRef):
                 param: Parameter = service_data.components.parameters[param_union.component_name]
@@ -91,9 +92,14 @@ class ParameterValidator:
                 log.debug("Skipping non-identifier parameter: %s", param.name)
                 continue
 
+            # If an explicit json_body payload is provided, do not demand decomposed body params
+            if param.in_ == "body" and has_explicit_body:
+                continue
+
             py_type = _openapi_to_python(param.schema_)
 
-            if param.is_required:
+            # Path, query, and header params respect is_required; decomposed body params are optional
+            if param.is_required and param.in_ != "body":
                 struct_fields.append((param.name, py_type))
             else:
                 struct_fields.append((param.name, py_type | None, None))
