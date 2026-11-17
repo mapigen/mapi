@@ -18,7 +18,14 @@ class Parameter(msgspec.Struct, frozen=True, tag="inline", gc=False, cache_hash=
     in_: ParameterLocation = msgspec.field(name="in")
     schema_: dict[str, Any] = msgspec.field(name="schema", default_factory=dict)
     description: str = ""
-    required: bool = False
+    required: bool | list[str] = False
+
+    @property
+    def is_required(self) -> bool:
+        """Return True if parameter itself is required."""
+        if isinstance(self.required, bool):
+            return self.required
+        return self.name in self.required
 
 
 class ParameterRef(msgspec.Struct, frozen=True, tag="ref", gc=False, cache_hash=True):

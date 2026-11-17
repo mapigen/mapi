@@ -93,7 +93,7 @@ class ParameterValidator:
 
             py_type = _openapi_to_python(param.schema_)
 
-            if param.required:
+            if param.is_required:
                 struct_fields.append((param.name, py_type))
             else:
                 struct_fields.append((param.name, py_type | None, None))

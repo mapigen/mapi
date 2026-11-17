@@ -61,7 +61,7 @@ class ToolService:
                 prop_def["default"] = param_schema["default"]
 
             properties[param.name] = prop_def
-            if param.required:
+            if param.is_required:
                 required.append(param.name)
 
         func_name = f"{provider}_{api}_{operation}".replace("-", "_")
