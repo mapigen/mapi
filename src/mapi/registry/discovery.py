@@ -126,3 +126,10 @@ class DiscoveryService:
                 operation=operation,
             )
         return op
+
+    def is_cached(self, provider: str, api: str, source: str | None = None) -> bool:
+        """Check if an API service specification is held in memory cache."""
+        src = self._resolve_source(provider, api, source)
+        if self._cache is not None:
+            return self._cache.is_cached(provider, api, src)
+        return False

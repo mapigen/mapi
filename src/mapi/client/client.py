@@ -274,6 +274,10 @@ class Mapi:
             self._executor = executor
         return executor.batch(requests, return_exceptions=return_exceptions)
 
+    def is_cached(self, provider: str, api: str, source: str | None = None) -> bool:
+        """Check if an API service specification is currently held in memory cache."""
+        return self.discovery.is_cached(provider, api, source)
+
     async def abatch(
         self,
         requests: Sequence[BatchRequest | tuple[str, str, str, dict[str, Any]]],

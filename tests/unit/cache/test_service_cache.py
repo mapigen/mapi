@@ -57,3 +57,11 @@ class TestServiceCache:
         assert "lru" in info
         assert "hits" in info["lru"]
         assert "misses" in info["lru"]
+
+    def test_is_cached(self, sample_service_data):
+        cache, _ = self._create_cache(sample_service_data)
+        assert not cache.is_cached("p", "a", "s")
+        cache.get("p", "a", "s")
+        assert cache.is_cached("p", "a", "s")
+        cache.clear()
+        assert not cache.is_cached("p", "a", "s")

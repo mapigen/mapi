@@ -24,6 +24,7 @@ class ServiceCache:
         self._loader = loader
         self._pinned_keys = pinned_keys
         self._pinned: dict[str, ServiceData] = {}
+        self._cached_keys: set[str] = set()
         self._lock = threading.Lock()
 
         loader_ref = loader
@@ -36,16 +37,23 @@ class ServiceCache:
 
     def get(self, provider: str, api: str, source: str) -> ServiceData:
         """Return ServiceData, retrieving from cache or loading from disk."""
-        if self._pinned_keys:
-            key = f"{provider}:{api}:{source}"
-            if key in self._pinned_keys:
-                if key in self._pinned:
-                    return self._pinned[key]
-                with self._lock:
-                    if key not in self._pinned:
-                        self._pinned[key] = self._loader.load_service(provider, api, source)
-                    return self._pinned[key]
+        key = f"{provider}:{api}:{source}"
+        with self._lock:
+            self._cached_keys.add(key)
+        if self._pinned_keys and key in self._pinned_keys:
+            if key in self._pinned:
+                return self._pinned[key]
+            with self._lock:
+                if key not in self._pinned:
+                    self._pinned[key] = self._loader.load_service(provider, api, source)
+                return self._pinned[key]
         return self._lru_load(provider, api, source)
+
+    def is_cached(self, provider: str, api: str, source: str) -> bool:
+        """Check if an API service is currently held in memory cache."""
+        key = f"{provider}:{api}:{source}"
+        with self._lock:
+            return key in self._pinned or key in self._cached_keys
 
     def put(
         self,
@@ -58,6 +66,7 @@ class ServiceCache:
         """Store or update a ServiceData instance in cache."""
         key = f"{provider}:{api}:{source}"
         with self._lock:
+            self._cached_keys.add(key)
             self._pinned[key] = data
             if pinned and key not in self._pinned_keys:
                 self._pinned_keys = self._pinned_keys | {key}
@@ -66,6 +75,7 @@ class ServiceCache:
         """Evict all cached entries."""
         with self._lock:
             self._pinned.clear()
+            self._cached_keys.clear()
         self._lru_load.cache_clear()
 
     def cache_info(self) -> dict:
