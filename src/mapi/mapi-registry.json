@@ -99,6 +99,19 @@
         "description": "Project and work management platform API",
         "categories": ["productivity", "project-management"]
       }
+    },
+    "dnd5e": {
+      "REST": {
+        "sources": ["github"],
+        "operation_count": 47,
+        "popularity_rank": 4,
+        "auth_types": [],
+        "primary_auth": "none",
+        "spec_url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/dnd5eapi.co/0.1/openapi.yaml",
+        "title": "D&D 5e SRD API",
+        "description": "Dungeons & Dragons 5th Edition SRD gaming API for spells, monsters, and classes",
+        "categories": ["games", "entertainment", "ttrpg"]
+      }
     }
   }
 }
